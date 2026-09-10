@@ -2,7 +2,7 @@ import { lstatSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 
-const documents = ["index.html", "about/architecture/index.html"];
+const documents = ["index.html", "projections/index.html", "about/architecture/index.html"];
 const initialFontPatterns = [
   /\/assets\/instrument-sans-latin-wght-normal-[A-Za-z0-9_-]+\.woff2/u,
   /\/assets\/instrument-serif-latin-400-normal-[A-Za-z0-9_-]+\.woff2/u,
@@ -17,30 +17,31 @@ export function inlineInitialStyles(dist) {
     const links = [
       ...html.matchAll(/<link rel="stylesheet" crossorigin href="(\/assets\/[^"/]+\.css)">/gu),
     ];
-    if (links.length !== 1) {
-      throw new Error(`${document} must contain exactly one initial stylesheet link`);
+    const atlas = document === "index.html";
+    if (!links.length || (!atlas && links.length !== 1)) {
+      throw new Error(`${document} must contain ${atlas ? "at least one" : "exactly one"} initial stylesheet link`);
     }
     const href = links[0][1];
-    if (expectedHref && href !== expectedHref) {
-      throw new Error("static routes do not share one initial stylesheet");
+    if (!atlas && expectedHref && href !== expectedHref) {
+      throw new Error("projection routes do not share one initial stylesheet");
     }
-    expectedHref = href;
-    const css = readFileSync(resolve(dist, href.slice(1)), "utf8");
+    if (!atlas) expectedHref = href;
+    const css = links.map(([, path]) => readFileSync(resolve(dist, path.slice(1)), "utf8")).join("\n");
     if (/<\/style/iu.test(css)) throw new Error("initial CSS cannot be safely embedded in HTML");
-    const initialFonts = initialFontPatterns.map((pattern) => css.match(pattern)?.[0]);
+    if (atlas && /@font-face\b/iu.test(css)) throw new Error("Atlas initial CSS must use system fonts");
+    const initialFonts = atlas ? [] : initialFontPatterns.map((pattern) => css.match(pattern)?.[0]);
     if (
       initialFonts.some((font) => !font) ||
-      new Set(initialFonts).size !== initialFontPatterns.length
+      (!atlas && new Set(initialFonts).size !== initialFontPatterns.length)
     ) {
       throw new Error("initial CSS does not contain the exact Latin Flight fonts");
     }
     const preloads = initialFonts
       .map((font) => `<link rel="preload" href="${font}" as="font" type="font/woff2" crossorigin>`)
       .join("");
-    writeFileSync(
-      path,
-      html.replace(links[0][0], `${preloads}<style data-static-initial-css>${css}</style>`),
-    );
+    let inlined = html.replace(links[0][0], `${preloads}<style data-static-initial-css>${css}</style>`);
+    for (const link of links.slice(1)) inlined = inlined.replace(link[0], "");
+    writeFileSync(path, inlined);
   }
   return { documents: documents.length, stylesheet: expectedHref };
 }

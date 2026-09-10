@@ -30,7 +30,7 @@ async function expectStaticDocumentSecurity(page: import("@playwright/test").Pag
 
 test("root worker activates naturally, reports its exact pair, and controls only after reload", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium");
-  await page.goto("/");
+  await page.goto("/projections/");
   expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull();
   const identity = await page.evaluate(async ({ appBuildId, dataReleaseId }) => {
     const registration = await navigator.serviceWorker.ready;
@@ -57,7 +57,7 @@ test("root worker activates naturally, reports its exact pair, and controls only
     precacheSetSha256: buildReport.serviceWorker.precacheSetSha256,
   });
 
-  await page.goto("/?scenario=ssp2-45&horizon=2050");
+  await page.goto("/projections/?scenario=ssp2-45&horizon=2050");
   expect(await page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
   const cachedRequests = await page.evaluate(async () => {
     const names = await caches.keys();
@@ -76,7 +76,7 @@ test("root worker activates naturally, reports its exact pair, and controls only
 test("warmed Flight shell, search, and one assessment survive a full offline reload", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium");
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
+  await page.goto("/projections/");
   await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
   const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
   await search.fill("Málaga");
@@ -135,7 +135,7 @@ test("landing shell is static, keyboard reachable, and has no serious accessibil
     if (isForbiddenApplicationApiPath(path)) forbiddenRequests.push(path);
   });
 
-  await page.goto("/");
+  await page.goto("/projections/");
   await expectStaticDocumentSecurity(page);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "Take me there.",
@@ -145,7 +145,7 @@ test("landing shell is static, keyboard reachable, and has no serious accessibil
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "SeaRise Europe home" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "SeaRise Europe projection reference" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Methodology and sources" })).toBeFocused();
   await page.keyboard.press("Tab");
@@ -167,7 +167,7 @@ test("landing shell is static, keyboard reachable, and has no serious accessibil
   await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeAttached();
 
   if (testInfo.project.name === "mobile-chromium") {
-    const brand = await page.getByRole("link", { name: "SeaRise Europe home" }).boundingBox();
+    const brand = await page.getByRole("link", { name: "SeaRise Europe projection reference" }).boundingBox();
     const badge = await page.locator(".flight-header .release-pill").boundingBox();
     const methodology = await page.getByRole("button", { name: "Methodology and sources" }).boundingBox();
     const heading = await page.getByRole("heading", { level: 1 }).boundingBox();
@@ -199,7 +199,7 @@ test("375px Flight renders the runtime offline state in the canonical header", a
   test.skip(testInfo.project.name !== "mobile-chromium");
   await page.setViewportSize({ width: 375, height: 812 });
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
+  await page.goto("/projections/");
   const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
   await search.fill("Málaga");
   await page.getByRole("option", { name: /Málaga.*Andalucía, ES/i }).click();
@@ -227,7 +227,7 @@ test("document CSP blocks an unlisted network origin before a request leaves the
     }
   });
 
-  await page.goto("/");
+  await page.goto("/projections/");
   await expectStaticDocumentSecurity(page);
   const rejectedByCsp = await page.evaluate(async () => {
     try {
@@ -249,7 +249,7 @@ test("manifest delivery failure has bounded same-release retry", async ({ page }
     await route.fulfill({ status: 503, contentType: "application/json", body: "{}" });
   });
 
-  await page.goto("/");
+  await page.goto("/projections/");
   await page.getByRole("button", { name: /retry pinned release/i }).click();
   await page.getByRole("button", { name: /retry pinned release/i }).click();
 
@@ -265,7 +265,7 @@ test("architecture direct navigation works from static output", async ({ page })
   await expectStaticDocumentSecurity(page);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Static-first");
   await expect(page.getByText(/synthetic fixture/i).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: /back to explorer/i })).toHaveAttribute("href", "/");
+  await expect(page.getByRole("link", { name: /back to projection reference/i })).toHaveAttribute("href", "/projections/");
 });
 
 test("API inspection exposes the production-like HEAD, CORS-header, and byte-range contract", async ({ page }) => {
@@ -360,7 +360,7 @@ test("Preview delivery makes PMTiles network-only while other release artifacts 
 });
 
 test("page context verifies a later COG chunk and measures cold versus cached lookup", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/projections/");
   await expectStaticDocumentSecurity(page);
 
   const observed = await page.evaluate(async ({ releaseId, runtimeUrl, artifactPath }) => {
@@ -576,7 +576,7 @@ test("local settlement worker is private, partial-ready, keyboard accessible, an
     await route.continue();
   });
 
-  await page.goto("/");
+  await page.goto("/projections/");
   await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
   const searchStatus = page.locator(".search-shell .status[data-search-readiness]");
   const input = page.getByRole("combobox", { name: /find a city/i });
@@ -648,7 +648,7 @@ test("settlement shard delivery failure remains a technical state", async ({ pag
   await page.route("**/search/europe-core.codepoint-trie.json.br", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/vnd.searise.search-index+json", body: "{}" });
   });
-  await page.goto("/");
+  await page.goto("/projections/");
   await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
   const input = page.getByRole("combobox", { name: /find a city/i });
   await input.focus();
@@ -671,7 +671,7 @@ test("exact CSP permits the real Brotli Worker while blocking JavaScript eval", 
       };`,
     });
   });
-  await page.goto("/");
+  await page.goto("/projections/");
   await expectStaticDocumentSecurity(page);
   await page.evaluate(() => {
     const probe = document.createElement("script");

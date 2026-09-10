@@ -15,6 +15,7 @@ import {
 } from "./data-source";
 import {
   SYNTHETIC_ATLAS_CATALOG,
+  SYNTHETIC_ATLAS_GRIDS,
   SYNTHETIC_ATLAS_PLACES,
   searchSyntheticAtlasPlaces,
   syntheticAtlasDepthAt,
@@ -99,7 +100,22 @@ function colorForDepth(depth: number): readonly [number, number, number, number]
   return DEPTH_COLORS[index];
 }
 
+let unknownTilePng: ArrayBuffer | undefined;
+
 function renderTile(request: AtlasTileRequest): AtlasTileResponse {
+  const grid = SYNTHETIC_ATLAS_GRIDS.find(({ year, protection }) =>
+    year === request.year && protection === request.protection)!;
+  const [west, south, east, north] = grid.extent.bounds;
+  // Monotonic pixel-center bounds prove every sample is unknown outside the
+  // authored grid; avoid scanning 65,536 empty pixels for each overview tile.
+  if (longitudeAt(request.x, request.z, TILE_SIZE - 1) < west
+      || longitudeAt(request.x, request.z, 0) > east
+      || latitudeAt(request.y, request.z, 0) < south
+      || latitudeAt(request.y, request.z, TILE_SIZE - 1) > north) {
+    unknownTilePng ??= encodePng(new Uint8Array(TILE_SIZE * TILE_SIZE * 4));
+    // Callers can transfer the buffer to a worker without detaching the cache.
+    return Object.freeze({ data: unknownTilePng.slice(0), validPixels: 0, floodPixels: 0 });
+  }
   const rgba = new Uint8Array(TILE_SIZE * TILE_SIZE * 4);
   let validPixels = 0;
   let floodPixels = 0;

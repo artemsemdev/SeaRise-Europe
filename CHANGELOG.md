@@ -13,6 +13,11 @@ All notable changes to this project will be documented in this file.
 
 - Prevented browsers and intermediaries from retaining private, locally derived
   coastal raster tiles by marking every tile response `no-store`.
+- Made fixture city markers easier to tap and aligned the flood-layer control
+  label with its accessible name.
+- Static-quality CI now installs the declared npm version for both the application
+  build and isolated Lighthouse tools.
+- Kept return-to-place controls available on mobile and tablet map views.
 - Restored boundary browser checks after the MapLibre update, including visible
   pixel validation and useful browser failure diagnostics. Refreshed the
   software-render QA receipt's dependency hash; rendered PNGs and scientific
@@ -29,8 +34,7 @@ All notable changes to this project will be documented in this file.
 
 - Added the accepted coastal atlas interface behind an injected data source,
   preserving city search, point inspection, comparison, shared views, and
-  mobile controls. The software fixture is visibly identified; the normal
-  application entry is connected separately.
+  mobile controls. The software fixture is visibly identified.
 
 - Added explicit synthetic-fixture and real-local coastal atlas data sources
   behind one abort-aware browser interface. Fixture inspection and PNG tiles
@@ -287,6 +291,16 @@ All notable changes to this project will be documented in this file.
   cross-platform Arrow schemas, and keep the sealed v1 release unchanged.
 
 ### Changed
+
+- Recorded a temporary, expiring fixture-performance exception for local atlas
+  adoption. Cold audit scores and the unmet 90-point target remain visible;
+  public release qualification and other quality gates are unchanged.
+
+- The coastal atlas is now the main application, with explicit fixture and
+  provisioned local workflows. The AR6 projection reference is available at
+  `/projections/`; its offline cache stays separate from the atlas and local data.
+- Map loading failures keep the controls available and offer a working retry;
+  reduced-motion navigation preserves the selected city during zoom.
 
 - Established the accepted coastal atlas as the main product target, with its own source and design contract. Earlier AR6/Flight guidance is now explicitly scoped to the retained projection reference; engineering adoption remains in progress.
 

@@ -31,12 +31,22 @@ function mediaTypeForPath(path) {
 
 function collectEntry(viteManifest, key, files) {
   const entry = viteManifest[key];
-  if (!entry || files.has(entry.file)) return;
+  if (!entry) throw new Error(`Vite manifest is missing imported entry ${key}`);
+  if (files.has(entry.file)) return;
   files.add(entry.file);
   for (const css of entry.css ?? []) files.add(css);
   for (const asset of entry.assets ?? []) files.add(asset);
   for (const imported of entry.imports ?? []) collectEntry(viteManifest, imported, files);
   for (const imported of entry.dynamicImports ?? []) collectEntry(viteManifest, imported, files);
+}
+
+export function namedEntryFiles(viteManifest, key) {
+  if (!viteManifest[key]?.isEntry || viteManifest[key].src !== key) {
+    throw new Error(`Vite manifest has no named application entry ${key}`);
+  }
+  const files = new Set();
+  collectEntry(viteManifest, key, files);
+  return files;
 }
 
 function emittedAssetFiles(dist) {
@@ -78,15 +88,17 @@ function collectEmittedReferences(dist, files) {
 }
 
 export function shellPrecachePaths({ dist, viteManifest, dataReleaseId }) {
-  const files = new Set();
-  const mainKey = Object.entries(viteManifest).find(([, entry]) =>
-    entry.dynamicImports?.includes("src/components/map/MapExplorer.tsx"),
-  )?.[0];
-  if (!mainKey) throw new Error("Vite manifest has no static application entry");
-  collectEntry(viteManifest, mainKey, files);
+  const files = namedEntryFiles(viteManifest, "src/main.tsx");
+  const atlasFiles = namedEntryFiles(viteManifest, "src/atlas/main.tsx");
+  const projectionFiles = new Set(files);
   collectEmittedReferences(dist, files);
+  for (const file of files) {
+    if (atlasFiles.has(file) && !projectionFiles.has(file)) {
+      throw new Error(`Atlas-only asset cannot enter the projection shell precache: ${file}`);
+    }
+  }
   return [
-    "/",
+    "/projections/index.html",
     `/${applicationBuildIdentityFile}`,
     ...[...files].map((path) => `/${path}`),
     `/releases/${dataReleaseId}/manifest.json`,

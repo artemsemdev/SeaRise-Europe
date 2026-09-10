@@ -70,12 +70,12 @@ async function clientCensus(page: import("@playwright/test").Page) {
 test("source-bound leases and worker census isolate concurrent tabs", async ({ context, page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium");
 
-  await page.goto("/");
+  await page.goto("/projections/");
   await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
   await expect.poll(() => storedLeases(page)).toHaveLength(1);
 
   const second = await context.newPage();
-  await second.goto("/");
+  await second.goto("/projections/");
   await expect(second.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
   await expect.poll(() => storedLeases(second)).toHaveLength(2);
 

@@ -2,6 +2,7 @@ import { cpSync, createReadStream, mkdirSync, readFileSync, rmSync, statSync } f
 import { resolve, sep } from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+import { atlasEditionPlugin } from "./scripts/atlas-edition.mjs";
 import { applicationBuildIdentityPlugin } from "./scripts/application-build-identity.mjs";
 import { buildIdentityFile, resolveBuildIdentity } from "./scripts/build-identity.mjs";
 import { releaseDeliveryPolicy } from "./scripts/release-delivery-policy.mjs";
@@ -25,6 +26,7 @@ const viteFilesystemRoots = Object.freeze([
   resolve(repositoryRoot, "node_modules"),
   fixturePayloadRoot,
   fixtureOverlayRoot,
+  resolve(repositoryRoot, "data/cartography"),
 ]);
 
 function forbiddenViteFilesystemRequest(requestUrl: string | undefined): boolean {
@@ -53,6 +55,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [
+      atlasEditionPlugin({ mode, repositoryRoot, buildRoot }),
       applicationBuildIdentityPlugin(buildIdentity),
       {
         name: "canonical-build-identity",
@@ -216,6 +219,9 @@ export default defineConfig(({ mode }) => {
         preserveEntrySignatures: "strict",
         input: {
           index: resolve(import.meta.dirname, "index.html"),
+          projections: resolve(import.meta.dirname, "projections/index.html"),
+          atlasApplication: resolve(import.meta.dirname, "src/atlas/main.tsx"),
+          projectionApplication: resolve(import.meta.dirname, "src/main.tsx"),
           architecture: resolve(import.meta.dirname, "about/architecture/index.html"),
           scientificRuntime: resolve(import.meta.dirname, "src/scientific-runtime.ts"),
           serviceWorker: resolve(import.meta.dirname, "src/offline/service-worker.ts"),

@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { namedEntryFiles } from "./service-worker-precache.mjs";
 
 const moduleUrl = new URL(import.meta.url);
 const webRoot = moduleUrl.protocol === "file:"
@@ -380,6 +381,19 @@ export function scanProductCopy(content) {
   return scanClaims(content, prohibitedProductCopy);
 }
 
+export function builtAtlasFiles(viteManifest) {
+  const atlas = namedEntryFiles(viteManifest, "src/atlas/main.tsx");
+  // Shared code retains the stricter projection vocabulary. The root document
+  // is the only HTML route whose own copy belongs to the Atlas product.
+  const others = namedEntryFiles(viteManifest, "src/main.tsx");
+  for (const [key, entry] of Object.entries(viteManifest)) {
+    if (entry.isEntry && key !== "src/atlas/main.tsx" && key !== "index.html") {
+      for (const file of namedEntryFiles(viteManifest, key)) others.add(file);
+    }
+  }
+  return new Set(["index.html", ...[...atlas].filter((file) => !others.has(file))]);
+}
+
 function repositorySources() {
   const production = filesBelow(resolve(webRoot, "src"), sourceExtensions).filter(
     (path) => !excludedSourceParts.some((part) => path.includes(part)),
@@ -437,12 +451,17 @@ function main() {
   const files = resolvedBuiltRoot
     ? filesBelow(resolvedBuiltRoot, builtExtensions)
     : repositorySources();
+  const atlasFiles = resolvedBuiltRoot ? builtAtlasFiles(JSON.parse(
+    readScanFile(resolve(resolvedBuiltRoot, "vite-manifest.json"), resolvedBuiltRoot),
+  )) : null;
   const allowedHistoricalPaths = builtRoot ? new Map() : loadHistoricalAllowlist();
   const violations = [];
   for (const path of files) {
     const repositoryPath = relative(repositoryRoot, path).replaceAll("\\", "/");
     const content = activeAuthoritativeDocument(readScanFile(path, scanRoot), path);
-    const product = builtRoot ? "projection" : sourceProductScope(repositoryPath);
+    const product = atlasFiles
+      ? (atlasFiles.has(relative(resolvedBuiltRoot, path).replaceAll("\\", "/")) ? "atlas" : "projection")
+      : sourceProductScope(repositoryPath);
     const contentViolations = [...scanContent(content, product)];
     const isProductCopy = builtRoot
       || path === resolve(webRoot, "index.html")

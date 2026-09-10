@@ -16,7 +16,7 @@ test("binds Candidate-v7 read-only through one private loopback origin", async (
     }
   });
 
-  await page.goto("/");
+  await page.goto("/projections/");
   await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveAttribute(
     "content",
     expectedCsp,

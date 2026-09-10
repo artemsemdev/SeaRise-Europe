@@ -19,7 +19,13 @@ async function responseAt(request, origin, path, expectedStatus = 200, init = un
 export async function validateGenericStaticHost(origin, dist, request = globalThis.fetch) {
   const root = await responseAt(request, origin, "/");
   requireCondition(root.headers.get("content-type")?.startsWith("text/html"), "/ is not HTML");
-  requireCondition((await root.text()).includes('<div id="root"></div>'), "/ is not the built application shell");
+  const atlasHtml = await root.text();
+  requireCondition(atlasHtml.includes('<div id="root"></div>'), "/ is not the built application shell");
+  requireCondition(atlasHtml.includes('<meta name="searise-atlas-edition" content="synthetic-fixture"'), "generic static quality requires the illustrative atlas edition");
+
+  const projection = await responseAt(request, origin, "/projections/");
+  requireCondition(projection.headers.get("content-type")?.startsWith("text/html"), "/projections/ is not HTML");
+  requireCondition((await projection.text()).includes('<div id="root"></div>'), "/projections/ is not the retained application shell");
 
   const architecture = await responseAt(request, origin, "/about/architecture/");
   requireCondition(
@@ -67,16 +73,25 @@ export async function validateGenericStaticHost(origin, dist, request = globalTh
 
   const buildReport = JSON.parse(readFileSync(resolve(dist, "build-report.json"), "utf8"));
   requireCondition(Array.isArray(buildReport.assets) && buildReport.assets.length > 0, "build report has no static assets");
+  const atlasInitial = buildReport.bundleIsolation?.atlasInitialFiles;
+  const projectionInitial = buildReport.bundleIsolation?.initialFiles;
+  requireCondition(Array.isArray(atlasInitial) && atlasInitial.length > 0 && Array.isArray(projectionInitial) && projectionInitial.length > 0, "build report is missing the named atlas/projection entry graphs");
+  const initialJavascript = new Set([...atlasInitial, ...projectionInitial].filter((path) => path.endsWith(".js")));
+  requireCondition(initialJavascript.size > 0 && [...initialJavascript].every((path) => buildReport.assets.some((asset) => asset.path === path)), "initial entry graph is missing reported JavaScript assets");
   for (const asset of buildReport.assets) {
     const response = await responseAt(request, origin, `/${asset.path}`, 200, { headers: { "accept-encoding": "br" } });
-    if (/^assets\/main-[^/]+\.js$/u.test(asset.path)) {
-      requireCondition(response.headers.get("content-encoding") === "br", "initial JavaScript is not served from its Brotli sidecar");
+    if (initialJavascript.has(asset.path)) {
+      requireCondition(Number.isSafeInteger(asset.brotliBytes) && asset.brotliBytes > 0, `${asset.path} is missing its Brotli measurement`);
+    }
+    if (initialJavascript.has(asset.path) && asset.brotliBytes < asset.bytes) {
+      requireCondition(response.headers.get("content-encoding") === "br", `${asset.path} initial JavaScript is not served from its Brotli sidecar`);
     }
     requireCondition((await response.arrayBuffer()).byteLength === asset.bytes, `/${asset.path} byte size differs from the build report`);
   }
 
   for (const path of [
     "/__missing_static_file__",
+    "/atlas-data/manifest.json", "/atlas-data/inspect",
     "/assess", "/geocode", "/config",
     "/v1/assess", "/v1/geocode", "/v1/config",
   ]) {
