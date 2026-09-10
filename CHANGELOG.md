@@ -30,6 +30,11 @@ All notable changes to this project will be documented in this file.
   now sample the same bounded grid, while real-local failures remain technical
   errors and never trigger synthetic fallback.
 
+- Added an explicit read-only real-local coastal atlas server adapter. Its
+  activation factory validates confined metadata, starts one verified raster
+  process, and serves loopback context, inspection, tile, and basemap requests
+  without exposing local storage identities or falling back to fixture data.
+
 - Added post-cutover validation that lets retained application and CI files
   evolve while preserving completed removal approvals and preventing the
   retired runtime from returning. Publication restrictions remain unchanged.
