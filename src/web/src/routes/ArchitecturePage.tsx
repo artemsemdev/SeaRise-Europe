@@ -21,13 +21,14 @@ function evidenceNote(): string {
 export default function ArchitecturePage() {
   return (
     <main id="main" className="architecture-page">
-      <a className="back-link" href="/">← Back to explorer</a>
-      <p className="eyebrow dark">Architecture evidence</p>
+      <a className="back-link" href="/projections/">← Back to projection reference</a>
+      <p className="eyebrow dark">AR6 projection reference · Architecture evidence</p>
       <h1>Static-first, release-scoped, and explicit about release status.</h1>
       <p className="lede">
-        SeaRise Europe precomputes deterministic geospatial work, publishes verifiable
-        artifacts, and lets the browser search and look up projections locally. The normal
-        journey requires no application backend, database, tile server, or runtime geocoder.
+        The retained AR6 projection reference precomputes deterministic geospatial work
+        and lets the browser search and look up projections locally. This reference
+        requires no application backend, database, tile server, or runtime geocoder.
+        The main coastal atlas has a separate data contract and an explicit local adapter.
       </p>
 
       <dl className="evidence-grid">

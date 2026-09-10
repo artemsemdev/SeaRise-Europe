@@ -1,3 +1,5 @@
+const REFERENCE_SHELL_PATH = "/projections/index.html";
+
 const OFFLINE_WORKER_PROTOCOL = "searise-offline-worker-v1" as const;
 const AUTHORITY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 const BUILD_DISPOSITIONS = new Set(["synthetic-fixture", "public-promoted"]);
@@ -227,7 +229,7 @@ function validatePrecache(value: EmbeddedPrecacheV3): Readonly<{
   const paths = entries.map((entry) => entry.path);
   if (
     entries.length < 3 ||
-    paths[0] !== "/" ||
+    !paths.includes(REFERENCE_SHELL_PATH) ||
     paths.some((path, index) => path !== [...paths].sort()[index]) ||
     new Set(paths).size !== paths.length ||
     !paths.includes(expectedManifest) ||
@@ -244,7 +246,7 @@ function validatePrecache(value: EmbeddedPrecacheV3): Readonly<{
       parsed.pathname !== path ||
       (path.startsWith("/releases/") &&
         path !== expectedManifest && path !== expectedRangeIntegrity) ||
-      (path !== "/" && path !== expectedManifest && path !== expectedRangeIntegrity &&
+      (path !== REFERENCE_SHELL_PATH && path !== expectedManifest && path !== expectedRangeIntegrity &&
         !path.startsWith("/assets/"))
     ) {
       throw new TypeError(`Precache URL is outside the shell allowlist: ${path}`);
@@ -393,8 +395,9 @@ export function createServiceWorkerRuntime(
       ) return undefined;
 
       const parsed = new URL(request.url);
-      const path = request.mode === "navigate" && parsed.pathname === "/"
-        ? "/"
+      const path = request.mode === "navigate" &&
+        ["/projections/", REFERENCE_SHELL_PATH].includes(parsed.pathname)
+        ? REFERENCE_SHELL_PATH
         : parsed.search || parsed.hash
           ? null
           : parsed.pathname;

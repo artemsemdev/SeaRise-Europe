@@ -47,7 +47,7 @@ const MapExplorer = lazy(() => import("./components/map/MapExplorer"));
 
 function Brand() {
   return (
-    <a className="brand" href="/" aria-label="SeaRise Europe home">
+    <a className="brand" href="/projections/" aria-label="SeaRise Europe projection reference">
       <span>SeaRise</span> <em>Europe</em>
     </a>
   );

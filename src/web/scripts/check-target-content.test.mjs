@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   activeAuthoritativeDocument,
+  builtAtlasFiles,
   ownerCommentVerificationArguments,
   postCutoverValidationArguments,
   readScanFile,
@@ -17,6 +18,30 @@ import {
 } from "./check-target-content.mjs";
 
 describe("built content containment", () => {
+  it("limits Atlas vocabulary to its named exclusive graph, keeping shared and projection assets strict", () => {
+    const manifest = {
+      "src/atlas/main.tsx": { src: "src/atlas/main.tsx", isEntry: true, file: "assets/atlas.js", imports: ["shared"], dynamicImports: ["atlas-map"], css: ["assets/atlas.css"] },
+      "src/main.tsx": { src: "src/main.tsx", isEntry: true, file: "assets/projections.js", imports: ["shared"] },
+      shared: { file: "assets/shared.js" },
+      "atlas-map": { file: "assets/coast.js" },
+      decoy: { file: "assets/atlas-looking-name.js" },
+    };
+    const atlas = builtAtlasFiles(manifest);
+    expect([...atlas].sort()).toEqual(["assets/atlas.css", "assets/atlas.js", "assets/coast.js", "index.html"]);
+    for (const path of ["assets/projections.js", "assets/shared.js", "assets/atlas-looking-name.js", "projections/index.html", "about/architecture/index.html"]) {
+      expect(atlas.has(path)).toBe(false);
+      expect(scanContent("Land modeled as exposed; inundation map", atlas.has(path) ? "atlas" : "projection")).toHaveLength(2);
+    }
+    expect(scanContent("Land modeled as exposed; inundation map", "atlas")).toHaveLength(0);
+    expect(scanProductCopy("This place is safe.")).toHaveLength(1);
+    const missing = { ...manifest };
+    delete missing["src/atlas/main.tsx"];
+    expect(() => builtAtlasFiles(missing)).toThrow(/no named application entry/);
+    expect(() => builtAtlasFiles({ ...manifest, "src/atlas/main.tsx": { ...manifest["src/atlas/main.tsx"], src: "src/main.tsx" } }))
+      .toThrow(/no named application entry/);
+    expect(() => builtAtlasFiles({ ...manifest, "atlas-map": undefined })).toThrow(/missing imported entry/);
+  });
+
   it("reads an external build root but rejects a symlink escape", () => {
     const builtRoot = mkdtempSync(resolve(tmpdir(), "target-content-built-"));
     const outsideRoot = mkdtempSync(resolve(tmpdir(), "target-content-outside-"));

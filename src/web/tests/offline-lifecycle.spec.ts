@@ -84,7 +84,7 @@ async function expectIdentity(page: Page, target: "controller" | "waiting", depl
 }
 
 async function bootInitialA(page: Page): Promise<void> {
-  await page.goto("/");
+  await page.goto("/projections/");
   await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
   await expect.poll(() => page.evaluate(async () => {
     const registration = await navigator.serviceWorker.getRegistration("/");
@@ -120,7 +120,7 @@ async function installWaiting(page: Page, deployment: Deployment): Promise<void>
 async function prepareUpdate(page: Page, second: Page, current: Deployment, next: Deployment): Promise<void> {
   await expectIdentity(page, "controller", current);
   await expectIdentity(page, "waiting", next);
-  await second.goto("/");
+  await second.goto("/projections/");
   await expect(second.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
   await expectIdentity(second, "controller", current);
   const controller = await workerIdentity(second, "controller");
