@@ -390,7 +390,7 @@ def handler_for(atlas: Atlas) -> type[BaseHTTPRequestHandler]:
                 {
                     "X-Valid-Pixels": str(valid),
                     "X-Flood-Pixels": str(flooded),
-                    "Cache-Control": "private, max-age=3600",
+                    "Cache-Control": "no-store",
                 },
             )
 
