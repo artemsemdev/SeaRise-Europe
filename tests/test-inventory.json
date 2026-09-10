@@ -9,6 +9,12 @@
       "reference": "scripts/atlas/europe_raster_service.py and src/pipeline/tests/atlas/test_europe_raster_service.py",
       "environment": "macOS arm64; Python 3.9; Rasterio; five deterministic temporary-raster cases passed, covering one-pass integrity, path confinement, native-grid point semantics, tile validity counts, and the closed HTTP route surface; no network, production raster, private candidate, durable cache, or publication claim"
     },
+    "inspection-2026-09-10-atlas-real-local-browser": {
+      "kind": "repository-inspection",
+      "observedAt": "2026-09-10T00:00:00Z",
+      "reference": "src/web/playwright.real-local.config.ts and src/web/tests/real-local",
+      "environment": "Explicit provisioned-data browser suite, separate from normal Playwright and CI. The 360-second estimate is a scheduling allowance; execution requires the ignored local raster, basemap, and place inputs and makes no public-release or scientific-approval claim."
+    },
     "local-2026-08-17-generic-static-lighthouse": {
       "kind": "local-measurement",
       "observedAt": "2026-08-17T12:16:37+02:00",
@@ -676,6 +682,23 @@
       "execution": { "tier": "release", "ciWorkflow": null, "ciJob": null, "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 10, "class": "fast", "evidenceRef": "local-2026-08-16-range-cache-compatibility", "scope": "focused-suite" },
       "flakiness": { "status": "environment-sensitive", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "The behavior is deterministic for pinned Playwright engines and committed fixture bytes, but the release-tier command requires all three managed browser binaries and loopback binding. Public-origin delivery is intentionally outside this suite." }
+    },
+    {
+      "id": "coastal-atlas-real-local-browser",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
+      "layer": "e2e",
+      "owner": "frontend",
+      "purpose": "Exercise the provisioned CoCliCo atlas, source inspection, responsive experience, map zoom, and European boundaries through the explicit read-only local adapter; independent from clean-clone fixture CI and public scientific approval.",
+      "sourcePaths": ["src/web/tests/real-local/*.spec.ts", "src/web/playwright.real-local.config.ts"],
+      "changedPaths": ["src/web/src/atlas/**", "src/web/scripts/real-local-*.mjs", "scripts/atlas/**", "data/cartography/**", "src/web/tests/real-local/**", "src/web/playwright.real-local.config.ts"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Explicit provisioned local browser validation; never a replacement for scientific or public publication approval." },
+      "commands": { "focused": "npx playwright test --config src/web/playwright.real-local.config.ts", "full": "npx playwright test --config src/web/playwright.real-local.config.ts" },
+      "execution": { "tier": "release", "ciWorkflow": null, "ciJob": null, "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 360, "class": "slow", "evidenceRef": "inspection-2026-09-10-atlas-real-local-browser", "scope": "focused-suite" },
+      "flakiness": { "status": "environment-sensitive", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Requires an already running real-local service, provisioned verified rasters, local basemap/place data, and Chromium. Normal Playwright excludes these journeys while TypeScript checks their source. No clean-clone or public-delivery pass is claimed by this registration." }
     },
     {
       "id": "static-private-candidate-binding",
@@ -1848,6 +1871,10 @@
 
     { "path": "src/web/src/atlas/EuropeMap.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/atlas/basemap-style.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/tests/real-local/local-inundation-atlas.spec.ts", "suite": "coastal-atlas-real-local-browser", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/tests/real-local/local-inundation-experience.spec.ts", "suite": "coastal-atlas-real-local-browser", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/tests/real-local/local-inundation-source.spec.ts", "suite": "coastal-atlas-real-local-browser", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/tests/real-local/local-inundation-zoom.spec.ts", "suite": "coastal-atlas-real-local-browser", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/MethodologyDialog.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/FlightCapabilityStatus.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/ProjectionPanel.test.tsx", "suite": "static-projection-panel", "status": "active", "removalGate": null, "replacementEvidence": null },
