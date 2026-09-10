@@ -67,6 +67,12 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         )
         self.assertNotIn("npm run local:e2e", workflow)
 
+    def test_atlas_cartography_routes_web_without_source_release_build(self) -> None:
+        outputs = classify_paths(["data/cartography/europe-display.geojson"])
+        self.assertTrue(outputs["web"])
+        self.assertFalse(outputs["pipeline"])
+        self.assertFalse(outputs["release"])
+
     def test_static_quality_routes_every_direct_release_fixture_input(self) -> None:
         root = Path(__file__).resolve().parents[2]
         workflow = (root / ".github/workflows/static-quality.yml").read_text(

@@ -105,7 +105,7 @@
       }
     ],
     "packageLockPath": "package-lock.json",
-    "packageLockSha256": "8627247d5f48968ec7e789687247304fe8940cda20e47919bbdcaf05c507c48d",
+    "packageLockSha256": "019a034af8b22c29b3f97e4b8bc77add293bcd353a09d539216a7a90587b2e06",
     "packages": {
       "@mapbox/vector-tile": "2.0.5",
       "fflate": "0.8.3",
