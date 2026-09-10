@@ -4,13 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Security
+
+- Updated MapLibre GL JS and its transitive URI parser to patched versions and
+  refreshed the active npm supply-chain profile and SBOM.
+
 ### Fixed
+
+- Restored boundary browser checks after the MapLibre update, including visible
+  pixel validation and useful browser failure diagnostics. Refreshed the
+  software-render QA receipt's dependency hash; rendered PNGs and scientific
+  approval evidence are unchanged.
 
 - Corrected contributor, architecture, delivery, and testing documentation to
   reflect the completed static-runtime repository cutover and current CI path
   routing.
 
 ### Added
+
+- Added post-cutover validation that lets retained application and CI files
+  evolve while preserving completed removal approvals and preventing the
+  retired runtime from returning. Publication restrictions remain unchanged.
 
 - Added an isolated issue #70 repository-removal authority profile and adapter
   that reuses the reviewed v2 lifecycle engine without rewriting the completed

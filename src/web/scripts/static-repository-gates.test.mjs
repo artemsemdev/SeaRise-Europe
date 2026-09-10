@@ -306,11 +306,16 @@ describe("static repository dependency gates", () => {
     expect(approvals).toBe(3);
     expect(readFileSync(resolve(root, "docs/evidence/history.md"), "utf8")).toBe("Historical evidence.\n");
 
-    writeFileSync(resolve(root, "src/web/scripts/static-repository-gates.mjs"), "createServer(app)\n");
+    writeFileSync(resolve(root, "src/web/scripts/static-repository-gates.mjs"), "// reviewed policy maintenance\n");
+    expect(validateStaticRepository({
+      mode: "repository-final", root, approvalValidator: approve, supplyChainValidator: skipSupplyChain,
+    }).violations).toHaveLength(0);
+    writeFileSync(resolve(root, "src/web/runtime.mjs"), "createServer(app)\n");
+    git(root, "add", "src/web/runtime.mjs");
     expect(() => validateStaticRepository({
       mode: "repository-final", root, approvalValidator: approve, supplyChainValidator: skipSupplyChain,
     }))
-      .toThrow(/Gate-policy trust root differs from the owner-approved audited blob/);
+      .toThrow(/node-production-server/);
   });
 
   it("fails closed on final authority and blob mutations during readiness", () => {

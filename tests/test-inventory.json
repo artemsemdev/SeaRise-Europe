@@ -1720,7 +1720,7 @@
       "replacementEvidence": null,
       "layer": "contract",
       "owner": "platform",
-      "purpose": "Fail closed across the repository-removal v2 P-to-D-to-A authority lifecycle before any issue 72 deletion is approved or applied.",
+      "purpose": "Preserve exact completed removal approval/application history and current historical authority, reject restored runtime paths, and permit retained application files to evolve under current quality gates.",
       "sourcePaths": ["contracts/repository-removal/v2/*.schema.json", "scripts/repository/*.py", "tests/repository-removal/*.py", ".github/workflows/ci.yml"],
       "changedPaths": ["contracts/repository-removal/**", "contracts/supply-chain/v2/static-target-profile.json", "scripts/repository/**", "tests/repository-removal/**", ".github/workflows/ci.yml"],
       "disposition": "keep-permanently",
@@ -1963,6 +1963,7 @@
     { "path": "tests/harness/test_inventory_evidence_time.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "tests/harness/test_changed_components.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "tests/harness/test_immutable_dependencies.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "tests/repository-removal/test_post_cutover.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "tests/repository-removal/test_candidate_isolation.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "tests/repository-removal/test_validate_removal_approval.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "tests/repository-removal/test_validate_removal_plan_v2.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null }
