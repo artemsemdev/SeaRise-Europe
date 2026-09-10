@@ -205,6 +205,13 @@ def test_http_surface_exposes_only_health_inspection_and_tiles(
     assert responses[-1][0] == 200
     assert json.loads(responses[-1][1])["results"][0]["status"] == "zero"
 
+    zoom, x, y = _slippy_tile(lon, lat, 18)
+    handler.path = f"/tiles/2030/unprotected/{zoom}/{x}/{y}.png"
+    handler.do_GET()
+    assert responses[-1][0] == 200
+    assert responses[-1][2] == "image/png"
+    assert responses[-1][3]["Cache-Control"] == "no-store"
+
     handler.path = "/own/inspect"
     handler.do_GET()
     assert responses[-1][0] == 404
