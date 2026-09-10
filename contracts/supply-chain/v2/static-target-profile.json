@@ -111,7 +111,7 @@
         {
           "path": "contracts/supply-chain/v2/sboms/static-web-npm.cdx.json",
           "role": "sbom",
-          "sha256": "6d3c98f403a71a925c80af84c155848e19b8da2381fb76c83bee046e357756c1"
+          "sha256": "6b66ac47ae5ff2a90e6061c75a86876e0fcfd6a3b503d67146b573bc33f2b8d0"
         }
       ]
     },
@@ -424,7 +424,7 @@
         {
           "path": "package-lock.json",
           "role": "lock",
-          "sha256": "8627247d5f48968ec7e789687247304fe8940cda20e47919bbdcaf05c507c48d"
+          "sha256": "019a034af8b22c29b3f97e4b8bc77add293bcd353a09d539216a7a90587b2e06"
         },
         {
           "path": "package.json",
@@ -434,7 +434,7 @@
         {
           "path": "src/web/package.json",
           "role": "manifest",
-          "sha256": "7dc77ce8e8b38702c8d2428ef22307c0969e233b5beabff594c14fabdefe94d0"
+          "sha256": "0ff6a63373bd1074b9386db0c6b79e4e8323b56c903c7e5221863da60e7ec164"
         }
       ]
     },

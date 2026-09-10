@@ -38,6 +38,7 @@ WEB = (
     "contracts/repository-removal/v1/historical-allowlist*.json",
     "src/web/**",
     "scripts/atlas/**",
+    "data/cartography/**",
     "tools/static-quality/**",
     "contracts/release/v1/**",
     "contracts/supply-chain/v2/**",
