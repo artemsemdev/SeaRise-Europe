@@ -114,6 +114,19 @@ describe("fixture atlas data source", () => {
     expect(repeated).toMatchObject({ validPixels: flooded.validPixels, floodPixels: flooded.floodPixels });
   });
 
+  it("keeps cached unknown PNG bytes intact when a consumer transfers a tile", async () => {
+    const source = createFixtureAtlasDataSource();
+    const request = { z: 3, x: 0, y: 0, year: 2050, protection: "unprotected" } as const;
+    const first = await source.getTile(request);
+    const original = first.data.slice(0);
+    structuredClone(first.data, { transfer: [first.data] });
+    expect(first.data.byteLength).toBe(0);
+    const next = await source.getTile(request);
+    expect(next.data).toEqual(original);
+    expect([next.validPixels, next.floodPixels]).toEqual([0, 0]);
+    expect(pngPixels(next.data)).toEqual({ width: 256, height: 256, opaquePixels: 0 });
+  });
+
   it("renders outside-grid tiles as unknown and rejects invalid or aborted requests", async () => {
     const source = createFixtureAtlasDataSource();
     const outside = await source.getTile({ year: 2050, protection: "unprotected", z: 2, x: 0, y: 0 });
