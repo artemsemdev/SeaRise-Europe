@@ -149,7 +149,7 @@
         {
           "path": ".github/workflows/static-quality.yml",
           "role": "workflow",
-          "sha256": "7bc23ad1d142f14f3ee1224aec2d585f439928c647ac7613464a6570d760de66"
+          "sha256": "532ee44e7953a1ff218fc5f034ee124e6d242a6feb547a8b79e9bcc01481e785"
         }
       ]
     },
