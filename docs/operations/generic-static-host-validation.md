@@ -48,7 +48,9 @@ features, settled tile counts, and no technical error is required in a separate
 browser preflight. Each audit starts its own new browser without an application
 preflight or shader-cache warming and rejects application errors in its console evidence. Performance, accessibility,
 best practices, and SEO must each have a median raw score of at least 0.90;
-the stricter guard also rejects any individual raw score below 0.90. Reports
+the stricter guard also checks every individual raw score against 0.90. The
+bounded local-adoption performance exception below retains these failed targets
+in evidence instead of reporting them as passes. Reports
 and the machine-readable run/median summary are written beneath the ignored
 `src/web/test-results/lighthouse/` directory. The isolated
 `.github/workflows/static-quality.yml` job runs the production build, generic
@@ -76,6 +78,38 @@ port cannot be mistaken for the build under test. No running preview is stopped.
 
 The static smoke prints `generic static-host validation passed`. Lighthouse
 prints all four category scores for each run and their median, then exits
-non-zero if any raw run or median is below 0.90. A missing Chromium
+non-zero if a raw run or median is below 0.90 without the exact temporary
+performance exception below. A missing Chromium
 installation, missing build output, unexpected
 dynamic route, or failed audit is a blocking failure rather than a deferral.
+
+
+## Temporary Atlas local-adoption performance exception
+
+Owner: **artemsemdev**. Issues: [#490](https://github.com/artemsemdev/SeaRise-Europe/issues/490)
+and [#65](https://github.com/artemsemdev/SeaRise-Europe/issues/65). Expires at
+**2026-09-24 00:00 UTC**, with no automatic renewal.
+
+[Linux run 34493541004](https://github.com/artemsemdev/SeaRise-Europe/actions/runs/34493541004)
+measured raw performance **54 / 53 / 55**, median **54**, against target **90**;
+accessibility was 96 and best practices/SEO 100 in every run. Cold MapLibre
+startup dominates the new map-first route, replacing the earlier static landing
+page. This measured engineering debt must not hold the accepted local product
+outside reproducible development while performance work continues under #65.
+
+The [checked policy](../../tools/static-quality/atlas-local-performance-waiver.json)
+applies only to the visibly labeled Atlas `synthetic-fixture` edition with
+synthetic release identity. Every cold run must score at least **50 performance**
+and **90 in each other category**. Renderer errors remain fatal. The three raw
+reports remain intact; the summary records `performance90Passed: false` and
+`waiverApplied: true`, and CI emits the actual scores, owner, floor, and expiry.
+Missing, malformed, extended, or expired policy fails closed. Fixing the debt
+requires retiring this temporary policy through review; expiry is not a silent
+return to unchecked operation.
+
+This is local adoption only: it qualifies neither a public MVP nor a scientific
+release and cannot apply to private-engineering or public-promoted identities.
+[ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md#15-performance-budgets-and-architecture-fitness-functions)
+and the [testing strategy](../architecture/10-testing-strategy.md#6-ci-stages)
+require the measured regression, rationale, owner, and expiry in the PR. The
+paragraphs above provide that disposition; no scientific authority is changed.

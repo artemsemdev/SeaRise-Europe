@@ -297,6 +297,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Recorded a temporary, expiring fixture-performance exception for local atlas
+  adoption. Cold audit scores and the unmet 90-point target remain visible;
+  public release qualification and other quality gates are unchanged.
+
 - The coastal atlas is now the main application, with explicit fixture and
   provisioned local workflows. The AR6 projection reference is available at
   `/projections/`; its offline cache stays separate from the atlas and local data.

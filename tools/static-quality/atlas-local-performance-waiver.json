@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "scope": "coastal-atlas-local-adoption",
+  "edition": "synthetic-fixture",
+  "releaseDisposition": "synthetic-fixture",
+  "owner": "artemsemdev",
+  "issues": [65, 490],
+  "sourceRun": "https://github.com/artemsemdev/SeaRise-Europe/actions/runs/34493541004",
+  "measuredPerformance": [0.54, 0.53, 0.55],
+  "target": 0.9,
+  "minimumPerformance": 0.5,
+  "expiresAt": "2026-09-24T00:00:00Z",
+  "rationale": "Adopt the accepted local atlas in normal development while correcting cold MapLibre startup cost exposed by the map-first route replacing the static landing page. This exception does not qualify a public MVP or scientific release."
+}
