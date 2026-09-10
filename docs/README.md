@@ -1,13 +1,15 @@
 # SeaRise Europe documentation
 
 The accepted main product is the coastal atlas. Engineering adoption is tracked
-in [#490](https://github.com/artemsemdev/SeaRise-Europe/issues/490); the integration
-branch still uses the projection entry until the primary-app slice lands.
+in [#490](https://github.com/artemsemdev/SeaRise-Europe/issues/490). The main route
+uses the illustrative atlas fixture by default; the retained projection entry
+is at `/projections/`.
 
 | Question | Read |
 | --- | --- |
 | What are we building? | [Coastal atlas requirements](product/COASTAL_ATLAS_PRD.md), [design](product/COASTAL_ATLAS_DESIGN.md), [copy](product/COASTAL_ATLAS_CONTENT.md) |
 | What changed architecturally? | [Atlas adoption decision](architecture/adr/ADR-028-coastal-atlas-adoption.md) |
+| How do I run the atlas? | [Fixture and provisioned local quickstart](operations/coastal-atlas-development.md) |
 | How do I contribute today? | [Contributor commands](../CONTRIBUTING.md), [testing](testing/README.md) |
 | What is implemented? | [Architecture overview](architecture/README.md); guides change with each implementation PR |
 | What remains? | [Atlas adoption epic](https://github.com/artemsemdev/SeaRise-Europe/issues/490); public hosting is a later workstream |
@@ -25,6 +27,6 @@ branch still uses the projection entry until the primary-app slice lands.
   paths and outcomes. The [earlier delivery roadmap](delivery/README.md) records
   completed static migration and subsequent hosting work; it does not replace #490.
 
-Local atlas startup/data documentation arrives with the corresponding runtime
-slice. Do not use this target definition as evidence that the current normal
-build already includes the accepted map.
+The [development quickstart](operations/coastal-atlas-development.md) separates
+fixture validation from the provisioned local source workflow. Neither implies
+public delivery or scientific-release approval.
