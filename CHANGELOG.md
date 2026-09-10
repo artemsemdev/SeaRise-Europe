@@ -29,6 +29,11 @@ All notable changes to this project will be documented in this file.
   evolve while preserving completed removal approvals and preventing the
   retired runtime from returning. Publication restrictions remain unchanged.
 
+- Added a strict browser-facing coastal atlas data contract and a compact,
+  explicitly synthetic fixture covering all six year and defense combinations,
+  four coastal places, deterministic tile counts, and distinct flooded, valid
+  zero, and unknown point values without exposing local filesystem provenance.
+
 - Added an isolated issue #70 repository-removal authority profile and adapter
   that reuses the reviewed v2 lifecycle engine without rewriting the completed
   issue #72 chain. Future Next.js removal approval must bind the dedicated
