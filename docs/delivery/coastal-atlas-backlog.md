@@ -73,10 +73,10 @@ make the backlog appear complete.
 
 ## Minimal issue maintenance
 
-Add a current-scope notice to #44 and update #490's child links/checkmarks only
-from merged PR evidence. Keep the original bodies as historical context. Then
-revise #63 and #65 through focused acceptance-criteria updates separating local
-checks, retained reference checks, and public release gates. Refresh #62/#74,
-#64, #66/#67, and #69 when public delivery design and authorization make their
-next actions concrete. This avoids duplicating useful unfinished work in a
-second permanent backlog.
+The current-scope notice has been added to #44, and #63/#65 now distinguish
+atlas acceptance criteria from retained public-release requirements. Keep
+#490's child links/checkmarks and current criteria aligned with merged PR and
+validation evidence. Preserve the original issue bodies as historical context.
+Refresh #62/#74, #64, #66/#67, and #69 when public delivery design and authorization
+make their next actions concrete. This avoids duplicating useful unfinished
+work in a second permanent backlog.

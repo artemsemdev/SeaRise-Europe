@@ -72,7 +72,7 @@ Read in this order:
 9. [Deployment](08-deployment-topology.md) — Cloudflare/R2 reference topology
    and portable delivery requirements.
 
-## Current document set
+## Retained projection document set
 
 | Document | Purpose |
 |---|---|
@@ -97,7 +97,7 @@ Read in this order:
 | [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md) | Authoritative static-first architecture decision |
 | [ADR-026](adr/ADR-026-authoritative-browser-range-persistence.md) | Authoritative complete-resource, COG range, and PMTiles persistence boundary |
 
-Supporting current documents:
+Supporting projection reference documents:
 
 - [Provisional methodology](../methodology.md)
 - [Static-first migration plan](../delivery/README.md)
@@ -105,7 +105,7 @@ Supporting current documents:
 - [Content guidelines](../product/CONTENT_GUIDELINES.md)
 - [Canonical Flight visual and interaction contract](../product/Mock/DESIGN.md)
 
-Architecture components implement the canonical Flight experience rather than
+Retained AR6 components implement the canonical Flight experience rather than
 substituting a generic dashboard or map utility. ADR-024 overrides the mock's
 binary exposure, terrain comparison, modeled-water/flood meaning, and related
 scientific copy; it does not override Flight's layout, information hierarchy,
@@ -126,7 +126,7 @@ Documents use these terms consistently:
 No document may use “implemented,” “validated,” or “production-ready” for the
 target architecture without executable evidence.
 
-## Fixed architecture contracts
+## Fixed AR6 reference contracts
 
 - Scenarios: `ssp1-26`, `ssp2-45`, `ssp5-85`.
 - Horizons: `2030`, `2050`, `2100`.
@@ -160,7 +160,8 @@ current.
 
 ## Documentation maintenance rules
 
-- ADR-021 wins when another document conflicts with it.
+- ADR-028 governs the coastal atlas; ADR-021 and its amendments govern the
+  retained AR6 reference and their explicitly retained delivery contracts.
 - A materially different runtime, scientific method, hosting dependency, or
   privacy model requires a new ADR.
 - Update diagrams and prose in the same pull request as a contract change.
