@@ -77,6 +77,7 @@ function canonicalPath(pathname) {
   const parts = decoded.split("/");
   if (parts.some((part) => part === "." || part === "..")) throw new Error("Path traversal is forbidden.");
   if (decoded === "/") return "index.html";
+  if (decoded === "/projections/") return "projections/index.html";
   if (decoded === "/about/architecture/") return "about/architecture/index.html";
   if (decoded.endsWith("/")) throw new Error("Unknown directory route.");
   return decoded.slice(1);
@@ -160,7 +161,7 @@ function staticHeaders(path, deployment, size) {
   }
   const noStore = path === "service-worker.js" ||
     path === "build-identity.json" || path === "build-report.json";
-  const revalidate = path === "index.html" || path === "assets/application-build-identity.js";
+  const revalidate = path === "index.html" || path === "projections/index.html" || path === "assets/application-build-identity.js";
   return {
     "Cache-Control": noStore ? "no-store" : revalidate ? "no-cache" :
       immutableAsset(path) ? "public, max-age=31536000, immutable" : "no-cache",

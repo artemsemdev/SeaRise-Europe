@@ -1,10 +1,13 @@
 # Contributing
 
-SeaRise Europe is migrating from its legacy distributed implementation to the
-static-first architecture accepted in
-[ADR-021](docs/architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md).
-Read that decision and the [active delivery plan](docs/delivery/README.md)
-before proposing implementation work.
+SeaRise Europe adopts the coastal atlas under
+[ADR-028](docs/architecture/adr/ADR-028-coastal-atlas-adoption.md) and
+[epic #490](https://github.com/artemsemdev/SeaRise-Europe/issues/490). Read the
+[atlas requirements](docs/product/COASTAL_ATLAS_PRD.md) and
+[development quickstart](docs/operations/coastal-atlas-development.md) before
+implementation work. [ADR-021](docs/architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
+and the [earlier delivery plan](docs/delivery/README.md) retain their scope for
+the AR6 reference and subsequent public-delivery work.
 
 ## Working rules
 
@@ -16,8 +19,10 @@ before proposing implementation work.
   acquired dataset.
 - Keep raw/large datasets, build outputs, credentials, and local state out of
   Git unless a reviewed fixture or public contract explicitly belongs here.
-- New product flows must not add dependencies to the retiring backend,
-  database, tile server, or runtime geocoder.
+- The atlas permits the explicit read-only loopback raster/place adapter in
+  real-local mode. Normal fixture development needs no local data service.
+  This exception does not authorize a public backend or change the retained
+  AR6 reference's static browser architecture.
 - Make scientific assumptions and uncertainty explicit.
 
 ## Pull requests
@@ -38,50 +43,47 @@ Use the repository pull request template and include:
 
 ## Local verification
 
-The static application is the authoritative target workflow. From the
-repository root:
+Normal verification exercises the illustrative atlas at `/` and the retained
+AR6 reference at `/projections/`. With Node 20.20.1 and npm 11.12.1, run from
+the repository root:
 
 ```bash
 npm ci
 npm run web:check
+npm exec --workspace @searise/web -- playwright install chromium
 npm run web:e2e
 npm run web:serve
 ```
 
-`web:serve` serves only the generated static output. Clean-clone builds copy the
-committed synthetic release fixture into that output; they never discover or
-copy the ignored private Phase 1 candidate. The manifest is the only browser
-entry point for a data release. Regenerate schema-derived browser types after a
-contract change with `npm run generate:contracts --workspace @searise/web`;
-`web:check` fails if the committed generated file is stale.
+`web:serve` serves the built fixture edition. Clean-clone builds use only
+committed illustrative inputs and the retained projection release fixture;
+they never discover or copy private data. `npm run web:dev` also selects the
+fixture explicitly.
 
-An operator may bind the ignored private candidate read-only for an explicit
-local test by following
-[`docs/operations/phase-2-private-release-binding.md`](docs/operations/phase-2-private-release-binding.md).
-That workflow serves the existing directory in place and is never part of a
-production build or CI.
+For provisioned CoCliCo data, follow the [atlas quickstart](docs/operations/coastal-atlas-development.md):
+start `npm run local:start`, then run `npm run local:e2e` separately against
+that service. These manual checks require ignored local inputs; they are not
+ordinary CI. Missing real-local data must fail without fixture fallback.
 
-Run the checks relevant to the files you changed. Until #70 and #71 remove the
-legacy baseline, its focused compatibility commands remain:
+The [private candidate binding](docs/operations/phase-2-private-release-binding.md)
+remains a separate read-only AR6 reference workflow. Its release manifest is
+the browser entry point for that reference's data. Regenerate schema-derived
+browser types after release-contract changes with
+`npm run generate:contracts --workspace @searise/web`; `web:check` detects stale
+generated types. Local validation does not qualify a public or scientific release.
+
+Run the checks relevant to the files you changed:
 
 ```bash
-# Frontend
-cd src/frontend
-npm ci
-npm run type-check
-npm test
-npm run build
-
-# API
-cd src/api
-dotnet test SeaRise.sln -c Release
+# Static browser application
+npm run web:check
 
 # Pipeline
 python -m pytest src/pipeline/tests
 ```
 
-As the static frontend and release pipeline are introduced, their checked-in
-scripts and CI jobs become authoritative. Do not rely on documentation-only
+The static browser and release pipeline's checked-in scripts and CI jobs are
+authoritative. Do not rely on documentation-only
 claims when an executable check can enforce the contract.
 
 ## TDD and test migration
@@ -122,7 +124,8 @@ and inventory record; retrying until green is not an acceptance result.
 
 ## Documentation
 
-- `docs/architecture/` describes the accepted target, not the legacy runtime.
+- `docs/architecture/` distinguishes the current atlas, retained AR6 reference,
+  and historical decisions.
 - `docs/delivery/README.md` records migration order and exit evidence.
 - `README.md` is the honest current/target status summary.
 - Update status and dates when meaning changes.

@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import { lstatSync, readFileSync } from "node:fs";
-import { extname, posix, relative, resolve } from "node:path";
+import { basename, extname, posix, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT_OUTPUTS = Object.freeze([
   "index.html",
+  "projections/index.html",
   "about/architecture/index.html",
   "vite-manifest.json",
   "service-worker.js",
@@ -86,6 +87,41 @@ function addViteEntryOutputs(expected, entry, label) {
     if (!Array.isArray(entry[field])) fail(`${label}.${field} is not an array`);
     for (const value of entry[field]) expected.add(safeStaticOutputPath(value, `${label}.${field}`));
   }
+}
+
+// Vite worker URLs can name emitted assets absent from vite-manifest.json.
+// Admit only the recursive literal-reference closure of declared JS/CSS;
+// merely residing in assets/ does not authorize a file or its sidecars.
+export function collectEmittedAssetReferences({ dist, files, paths }) {
+  const extensions = new Set([".css", ".js", ".json", ".png", ".svg", ".wasm", ".woff", ".woff2"]);
+  const candidates = paths.map((path) => relative(dist, path).replaceAll("\\", "/"))
+    .filter((path) => path.startsWith("assets/") && extensions.has(extname(path)))
+    .map((path) => safeStaticOutputPath(path, "Emitted referenced asset"));
+  if (new Set(candidates.map((path) => basename(path))).size !== candidates.length) {
+    fail("Emitted asset basenames must be unique for reference closure");
+  }
+  const result = new Set(files);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const sourcePath of [...result]) {
+      if (![".css", ".js"].includes(extname(sourcePath))) continue;
+      const absolute = resolve(dist, safeStaticOutputPath(sourcePath, "Reference source"));
+      if (!paths.includes(absolute)) continue;
+      const metadata = lstatSync(absolute);
+      if (!metadata.isFile() || metadata.isSymbolicLink()) fail(`Reference source is not a regular file: ${sourcePath}`);
+      const source = readFileSync(absolute, "utf8");
+      for (const candidate of candidates) {
+        if (result.has(candidate)) continue;
+        const name = basename(candidate);
+        if (source.includes(candidate) || source.includes(`./${name}`) || source.includes(`/${name}`)) {
+          result.add(candidate);
+          changed = true;
+        }
+      }
+    }
+  }
+  return result;
 }
 
 function referencedSourceMap(dist, output) {
@@ -173,12 +209,15 @@ export function validateStaticOutputIsolation({
   }
   if (!Array.isArray(shellManifestPaths)) fail("Embedded shell manifest paths are not an array");
   for (const [index, path] of shellManifestPaths.entries()) {
-    if (path === "/") expected.add("index.html");
-    else if (typeof path === "string" && path.startsWith("/")) {
+    if (path === "/" || path === "/index.html" || /^\/atlas-data(?:[/?#]|$)/u.test(path)) {
+      fail("Atlas documents and data cannot enter the projection shell precache");
+    }
+    if (typeof path === "string" && path.startsWith("/")) {
       expected.add(safeStaticOutputPath(path.slice(1), `Embedded shell manifest path ${index}`));
     } else fail(`Embedded shell manifest path ${index} is not root-relative`);
   }
 
+  for (const output of collectEmittedAssetReferences({ dist, files: expected, paths })) expected.add(output);
   const viteOutputs = [...expected];
   for (const output of viteOutputs) {
     const absolute = resolve(dist, output);

@@ -18,6 +18,7 @@ async function acceptMapPoint(page: Page): Promise<void> {
 
 test("map is the static-first scene, loads bounded PMTiles ranges, and keeps one atomic active overlay", async ({ page }) => {
   const pmtilesRequests: { url: string; range?: string }[] = [];
+  const mapWorkerResponses: number[] = [];
   const forbiddenRequests: string[] = [];
   page.on("request", (request) => {
     const url = new URL(request.url());
@@ -26,12 +27,18 @@ test("map is the static-first scene, loads bounded PMTiles ranges, and keeps one
     }
     if (isForbiddenApplicationApiPath(url.pathname)) forbiddenRequests.push(url.pathname);
   });
+  page.on("response", (response) => {
+    if (/\/assets\/maplibre-gl-worker-[^/]+\.js$/.test(new URL(response.url()).pathname)) {
+      mapWorkerResponses.push(response.status());
+    }
+  });
 
-  await page.goto("/");
+  await page.goto("/projections/");
   await expect(page.getByRole("region", { name: /visual release map preview/i })).toBeVisible();
   await expect(page.locator(".map-status")).toBeHidden();
   await expect(page.locator(".maplibregl-control-container")).toBeHidden();
   await expect.poll(() => pmtilesRequests.length).toBeGreaterThan(0);
+  await expect.poll(() => mapWorkerResponses).toEqual([200]);
 
   for (const request of pmtilesRequests) {
     expect(new URL(request.url).pathname).toBe(`/releases/${releaseId}/layers/ssp2-45/2050.pmtiles`);
@@ -70,7 +77,7 @@ test("all nine release selections resolve without mixing visual artifact identit
       responsePolicies.push(response.headers()["cache-control"] ?? "");
     }
   });
-  await page.goto("/");
+  await page.goto("/projections/");
   await expect(page.getByRole("region", { name: /visual release map preview/i })).toBeVisible();
   await expect(page.locator(".map-status")).toContainText(/central visual band ready/i);
   await acceptMapPoint(page);
@@ -239,7 +246,7 @@ test("basemap failure preserves release overlay, attribution, text, and coordina
     await route.fulfill({ status: 503, contentType: "application/json", body: "{}" });
   });
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
+  await page.goto("/projections/");
   await acceptMapPoint(page);
   const map = page.getByRole("region", { name: /interactive visual map/i });
   await expect(map).toHaveAttribute("data-artifact-id", "projection-ssp2-45-2050-pmtiles");

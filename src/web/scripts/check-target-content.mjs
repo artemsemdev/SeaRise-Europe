@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { namedEntryFiles } from "./service-worker-precache.mjs";
 
 const moduleUrl = new URL(import.meta.url);
 const webRoot = moduleUrl.protocol === "file:"
@@ -25,7 +26,8 @@ const canonicalFlightRequirementsPath = resolve(
   "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
 );
 const canonicalFlightContractMarkers = Object.freeze([
-  "ACTIVE CANONICAL VISUAL AND INTERACTION REFERENCE.",
+  "AR6 PROJECTION REFERENCE ONLY.",
+  "CANONICAL VISUAL AND INTERACTION REFERENCE FOR THE RETAINED PROJECTION APP.",
   "PRESERVE: layout, information hierarchy, map-first composition, controls,",
   "SCIENTIFIC CONTENT EXCEPTION (ADR-024):",
   "exposed and notexposed -> ProjectionAvailable",
@@ -35,7 +37,7 @@ const canonicalFlightContractMarkers = Object.freeze([
   "technical failures stay outside the scientific outcome domain.",
 ]);
 const canonicalFlightRequirementsMarkers = Object.freeze([
-  "> **Status:** Active implementation contract",
+  "> **Status:** Retained AR6 projection implementation contract",
   "## Non-negotiable preservation contract",
   "| `ProjectionAvailable` | Replace both `exposed` and `notexposed` binary cards",
   "| `DataUnavailable` | Maps from `unavailable` |",
@@ -81,9 +83,6 @@ const activeAuthorityPaths = new Set([
   "docs/architecture/adr/ADR-024-ar6-regional-projection-contract.md",
   "docs/methodology.md",
   "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
-]);
-const gatePolicyTrustPaths = Object.freeze([
-  "src/web/scripts/static-repository-gates.mjs",
 ]);
 
 export const prohibitedTargetClaims = Object.freeze([
@@ -234,79 +233,34 @@ export function ownerCommentVerificationArguments(helpText, root) {
   return ["--repository-root", root, "--verify-owner-comment"];
 }
 
-function approvedRemovalChain(root) {
-  const validator = resolve(root, "scripts/repository/validate_issue71_removal.py");
-  const receiptPath = "contracts/repository-removal/v2/issue-71/application-receipt.json";
-  if (!existsSync(validator)) throw new Error("Issue-71 repository-removal validator is missing");
-  readRegularFile(validator, null, root);
-  let receiptCommit;
-  let headCommit;
-  try {
-    const additions = execFileSync(
-      "git", ["log", "--format=%H", "--diff-filter=A", "--", receiptPath],
-      { cwd: root, encoding: "utf8" },
-    ).trim().split("\n").filter(Boolean);
-    if (additions.length !== 1) {
-      throw new Error("issue-71 receipt must have one exact addition commit");
-    }
-    [receiptCommit] = additions;
-    headCommit = execFileSync("git", ["rev-parse", "HEAD"], {
-      cwd: root,
-      encoding: "utf8",
-    }).trim();
-  } catch (error) {
-    throw new Error(`Issue-71 authority anchors cannot be derived: ${error.message}`);
-  }
-  try {
-    execFileSync("python3", [
-      validator,
-      "--repository-root", root,
-      "post-application",
-      "--receipt-commit", receiptCommit,
-      "--head-commit", headCommit,
-      "--verify-owner-comment",
-    ], {
-      cwd: root,
-      encoding: "utf8",
-      stdio: "pipe",
-    });
-  } catch (error) {
-    const detail = error?.stdout?.toString().trim() || error?.stderr?.toString().trim();
-    throw new Error(`Issue-71 repository-removal approval chain is invalid${detail ? `: ${detail}` : ""}`);
-  }
-  const plan = JSON.parse(readRegularFile(
-    resolve(root, "contracts/repository-removal/v2/issue-71/removal-plan.json"),
-    "utf8",
-    root,
-  ));
-  return new Map(gatePolicyTrustPaths.map((path) => {
-    const matches = plan.entries.filter((entry) =>
-      entry.path === path && entry.after?.state === "present");
-    const approvedBlob = matches[0]?.after?.gitBlobSha;
-    if (matches.length !== 1 || !/^[a-f0-9]{40}$/u.test(approvedBlob ?? "")) {
-      throw new Error(`Issue-71 plan lacks one exact approved gate-policy blob: ${path}`);
-    }
-    return [path, approvedBlob];
-  }));
+export function postCutoverValidationArguments(root, headCommit) {
+  return [
+    resolve(root, "scripts/repository/validate_post_cutover.py"),
+    "--repository-root", root,
+    "--head-commit", headCommit,
+    "--evidence-only",
+  ];
 }
 
-function validateGatePolicyTrustRoots(root, auditedCommit, approvedBlobs) {
-  for (const path of gatePolicyTrustPaths) {
-    const currentBlob = gitBlobSha(readRegularFile(resolve(root, path), null, root));
-    const auditedBlob = execFileSync("git", ["rev-parse", `${auditedCommit}:${path}`], {
-      cwd: root,
-      encoding: "utf8",
-    }).trim();
-    if (currentBlob !== (approvedBlobs?.get(path) ?? auditedBlob)) {
-      throw new Error(`Gate-policy trust root differs from the owner-approved audited blob: ${path}`);
-    }
+function completedRemovalEvidence(root) {
+  const headCommit = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
+  const args = postCutoverValidationArguments(root, headCommit);
+  readRegularFile(args[0], null, root);
+  try {
+    execFileSync("python3", args, { cwd: root, encoding: "utf8", stdio: "pipe" });
+  } catch (error) {
+    const detail = error?.stdout?.toString().trim() || error?.stderr?.toString().trim();
+    throw new Error(`Pinned completed evidence or current safeguards are invalid${detail ? `: ${detail}` : ""}`);
   }
 }
 
 export function loadHistoricalAllowlist({
   authority = "readiness",
   root = repositoryRoot,
-  validateApproval = approvedRemovalChain,
+  validateApproval = completedRemovalEvidence,
 } = {}) {
   const approvedPath = resolve(root, "contracts/repository-removal/v1/historical-allowlist.json");
   const preapprovalPath = resolve(root, "contracts/repository-removal/v1/historical-allowlist.preapproval.json");
@@ -318,9 +272,7 @@ export function loadHistoricalAllowlist({
     throw new Error("Approved historical allowlist is missing");
   }
   const effectiveAuthority = approvedExists ? "approved" : authority;
-  const approvedGatePolicyBlobs = effectiveAuthority === "approved"
-    ? validateApproval(root)
-    : undefined;
+  if (effectiveAuthority === "approved") validateApproval(root);
   const path = approvedExists ? approvedPath : preapprovalPath;
   if (!existsSync(path)) throw new Error("Exact historical terminology allowlist is missing");
   const document = JSON.parse(readRegularFile(path, "utf8", root));
@@ -343,9 +295,6 @@ export function loadHistoricalAllowlist({
       authority: effectiveAuthority,
       ...approvedGitResolvers,
     });
-  if (effectiveAuthority === "approved") {
-    validateGatePolicyTrustRoots(root, document.auditedCommit, approvedGatePolicyBlobs);
-  }
   return entries;
 }
 
@@ -364,20 +313,18 @@ export function activeAuthoritativeDocument(content, path) {
     "`ProjectionAvailable` replaces both explicitly rejected legacy state identifiers, which do not appear in a release governed by this ADR.");
 }
 
-function verifyCanonicalFlightContract() {
-  const content = readRegularFile(canonicalFlightMockPath, "utf8");
+export function validateFlightReferenceContract(content, requirements) {
   const doctype = content.indexOf("<!DOCTYPE html>");
   if (doctype < 0) throw new Error("Canonical Flight mock is missing its document boundary");
   const annotation = content.slice(0, doctype);
-  if (annotation.includes("HISTORICAL EVIDENCE ONLY")) {
-    throw new Error("Canonical Flight mock is incorrectly labelled as historical-only evidence");
+  if (annotation.includes("ACTIVE CANONICAL VISUAL AND INTERACTION REFERENCE.")) {
+    throw new Error("Flight must be scoped to the retained AR6 projection reference");
   }
   for (const marker of canonicalFlightContractMarkers) {
     if (!annotation.includes(marker)) {
       throw new Error(`Canonical Flight mock is missing its authority marker: ${marker}`);
     }
   }
-  const requirements = readRegularFile(canonicalFlightRequirementsPath, "utf8");
   for (const marker of canonicalFlightRequirementsMarkers) {
     if (!requirements.includes(marker)) {
       throw new Error(`Canonical Flight requirements are missing their authority marker: ${marker}`);
@@ -405,12 +352,46 @@ function scanClaims(content, claims) {
   return Object.freeze(violations);
 }
 
-export function scanContent(content) {
-  return scanClaims(content, prohibitedTargetClaims);
+// Only the atlas may describe source-backed modeled exposure and inundation.
+// Other legacy outcomes and all certainty/property claims remain prohibited.
+const atlasSourceDocuments = new Set([
+  "docs/product/COASTAL_ATLAS_PRD.md",
+  "docs/product/COASTAL_ATLAS_CONTENT.md",
+  "docs/product/COASTAL_ATLAS_DESIGN.md",
+  "docs/architecture/adr/ADR-028-coastal-atlas-adoption.md",
+]);
+const atlasDomainClaims = new Set(["affirmative-modeled-exposure", "inundation-product"]);
+
+export function sourceProductScope(repositoryPath) {
+  const canonical = !repositoryPath.includes("\\") && !repositoryPath.startsWith("/")
+    && repositoryPath.split("/").every((part) => part && part !== "." && part !== "..");
+  return canonical && (repositoryPath.startsWith("src/web/src/atlas/")
+    || atlasSourceDocuments.has(repositoryPath)) ? "atlas" : "projection";
+}
+
+export function scanContent(content, product = "projection") {
+  if (product !== "projection" && product !== "atlas") throw new Error("Unknown product scope");
+  const claims = product === "atlas"
+    ? prohibitedTargetClaims.filter((claim) => !atlasDomainClaims.has(claim.id))
+    : prohibitedTargetClaims;
+  return scanClaims(content, claims);
 }
 
 export function scanProductCopy(content) {
   return scanClaims(content, prohibitedProductCopy);
+}
+
+export function builtAtlasFiles(viteManifest) {
+  const atlas = namedEntryFiles(viteManifest, "src/atlas/main.tsx");
+  // Shared code retains the stricter projection vocabulary. The root document
+  // is the only HTML route whose own copy belongs to the Atlas product.
+  const others = namedEntryFiles(viteManifest, "src/main.tsx");
+  for (const [key, entry] of Object.entries(viteManifest)) {
+    if (entry.isEntry && key !== "src/atlas/main.tsx" && key !== "index.html") {
+      for (const file of namedEntryFiles(viteManifest, key)) others.add(file);
+    }
+  }
+  return new Set(["index.html", ...[...atlas].filter((file) => !others.has(file))]);
 }
 
 function repositorySources() {
@@ -458,7 +439,10 @@ function verifyMutationSensitivity() {
 
 function main() {
   verifyMutationSensitivity();
-  verifyCanonicalFlightContract();
+  validateFlightReferenceContract(
+    readRegularFile(canonicalFlightMockPath, "utf8"),
+    readRegularFile(canonicalFlightRequirementsPath, "utf8"),
+  );
   const builtIndex = process.argv.indexOf("--built");
   const builtRoot = builtIndex < 0 ? null : process.argv[builtIndex + 1];
   if (builtIndex >= 0 && !builtRoot) throw new Error("--built requires a directory");
@@ -467,12 +451,18 @@ function main() {
   const files = resolvedBuiltRoot
     ? filesBelow(resolvedBuiltRoot, builtExtensions)
     : repositorySources();
+  const atlasFiles = resolvedBuiltRoot ? builtAtlasFiles(JSON.parse(
+    readScanFile(resolve(resolvedBuiltRoot, "vite-manifest.json"), resolvedBuiltRoot),
+  )) : null;
   const allowedHistoricalPaths = builtRoot ? new Map() : loadHistoricalAllowlist();
   const violations = [];
   for (const path of files) {
     const repositoryPath = relative(repositoryRoot, path).replaceAll("\\", "/");
     const content = activeAuthoritativeDocument(readScanFile(path, scanRoot), path);
-    const contentViolations = [...scanContent(content)];
+    const product = atlasFiles
+      ? (atlasFiles.has(relative(resolvedBuiltRoot, path).replaceAll("\\", "/")) ? "atlas" : "projection")
+      : sourceProductScope(repositoryPath);
+    const contentViolations = [...scanContent(content, product)];
     const isProductCopy = builtRoot
       || path === resolve(webRoot, "index.html")
       || path.startsWith(`${resolve(webRoot, "src")}${sep}`)

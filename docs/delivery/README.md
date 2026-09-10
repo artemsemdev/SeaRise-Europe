@@ -1,16 +1,20 @@
 # Static-First Migration Plan
 
+> **Current product integration:** [#490 — Adopt the coastal atlas](https://github.com/artemsemdev/SeaRise-Europe/issues/490) governs the main application migration. The roadmap below records the earlier static projection migration and subsequent public delivery work.
+
 > **Status:** Phase 1 complete; Phase 2 static-only integration complete
 > **Last updated:** 2026-08-20
 > **Decision sources:** [ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](../architecture/adr/ADR-024-ar6-regional-projection-contract.md) and [ADR-025](../architecture/adr/ADR-025-accelerated-static-runtime-cutover.md)
 
 ## Purpose
 
-This is the only active technical delivery plan for SeaRise Europe. The former
-eight-epic Azure/backend plan was removed after ADR-021 replaced its target
-architecture.
+This roadmap records the static projection migration and its later public
+delivery work. The current coastal atlas integration is tracked in #490; see the
+[backlog scope mapping](coastal-atlas-backlog.md) for retained and deferred work. The
+former eight-epic Azure/backend plan was removed after ADR-021 replaced that
+runtime.
 
-The Phase 2 integration branch now provides:
+The completed Phase 2 projection integration provided:
 
 - a React/Vite static application backed by immutable browser-ready artifacts;
 - no checked-in request-time application, database, tile, geocoder, or Compose
@@ -23,9 +27,10 @@ The Phase 2 integration branch now provides:
   remains ignored and local only; clean clones use the committed synthetic
   release fixture.
 
-ADR-025 makes the static application the only repository runtime. Focused Phase
-2 pull requests removed the superseded runtime after replacement coverage
-passed; Git history is sufficient source recovery.
+At the ADR-025 cutover, the static application became the only repository
+runtime. Focused Phase 2 pull requests removed the superseded runtime after
+replacement coverage passed; Git history is sufficient source recovery.
+ADR-028 subsequently permits the atlas's explicit read-only loopback adapter.
 
 ## Delivery principles
 
@@ -44,19 +49,19 @@ Per `AGENTS.md`, implementation work should be split into focused pull requests,
 normally 100–400 changed lines and no more than about 800 for mechanical work.
 Use Conventional Commits and the repository pull-request template.
 
-## Current baseline
+## Completed Phase 2 projection baseline
 
-| Area | Current repository | Accepted target |
-|---|---|---|
-| Frontend | Next.js 14 / React 18 | React 19 / Vite 8 static build |
-| Search | Runtime geocoder through .NET API | GeoNames index in a Web Worker |
-| Result lookup | .NET orchestration + PostGIS + TiTiler | Browser boundary checks + exact source-grid projection lookup |
-| Map layers | TiTiler reads COGs | MapLibre reads PMTiles ranges from object storage |
-| Configuration | PostgreSQL via `/v1/config/*` | Versioned JSON manifest/config |
-| Data processing | Python modules; synthetic local demo | Reproducible real-data offline release pipeline |
-| Hosting | Azure design, not provisioned | Workers Static Assets + R2 custom domain |
-| Infrastructure | Terraform for Azure | OpenTofu for static host/object delivery |
-| Provenance | Source notes and tests | Checksums + STAC + SLSA + Cosign |
+| Area | Completed projection baseline |
+|---|---|
+| Frontend | React 19 / Vite 8 static build |
+| Search | Release-bound GeoNames index in a Web Worker |
+| Result lookup | Browser boundary checks and exact source-grid projection lookup |
+| Map layers | MapLibre reads PMTiles ranges from static artifacts |
+| Configuration | Versioned JSON manifest and configuration |
+| Data processing | Reproducible offline release pipeline; clean-clone checks use the committed fixture |
+| Hosting | Portable static output; Cloudflare Workers Static Assets and R2 are the reference topology |
+| Infrastructure | Planned OpenTofu for the reference static host and object-delivery topology; no IaC is committed yet |
+| Provenance | Checksums, STAC, SLSA provenance, and Cosign contracts |
 
 ## Workstream 0 — scientific proof and recovery (`complete`)
 
@@ -169,21 +174,26 @@ Exit evidence:
 - COG and PMTiles validators, schemas, STAC validation, licences, and hashes
   pass in CI.
 
-## Workstream 2 — static browser application
+## Workstream 2 — static browser application (`complete`)
 
-- [ ] Establish the React 19, TypeScript, and Vite 8 application shell.
-- [ ] Preserve semantic first paint, responsive layout, and WCAG 2.2 AA
-  behaviour.
-- [ ] Load the pinned release manifest and reject malformed/incomplete data.
-- [ ] Add MapLibre and the PMTiles protocol as lazy chunks.
-- [ ] Add the local search Web Worker and measured ranking fixtures.
-- [ ] Implement local Europe/coastal boundary checks.
-- [ ] Implement exact COG projection lookup and four-state result mapping.
-- [ ] Keep location, scenario, horizon, and release in shareable URL state.
-- [ ] Add versioned service-worker caches and honest offline indicators.
-- [ ] Add graceful basemap failure; projection lookup must remain functional.
-- [ ] Add `/about/architecture` with release/provenance/quality evidence.
-- [ ] Remove runtime requests to `/geocode`, `/assess`, and `/config`.
+Completion here means the repository, committed fixture, and Chromium journeys
+meet the [Phase 2 static-only repository audit](../evidence/phase-2/final-static-only-audit.md).
+It does not claim that a public scientific release has passed the later
+full-source, deployment, or browser-qualification gates.
+
+- [x] Establish the React 19, TypeScript, and Vite 8 application shell.
+- [x] Preserve semantic first paint and responsive layout, and enforce the
+  implemented automated accessibility checks.
+- [x] Load the pinned release manifest and reject malformed/incomplete data.
+- [x] Add MapLibre and the PMTiles protocol as lazy chunks.
+- [x] Add the local search Web Worker and measured ranking fixtures.
+- [x] Implement local Europe/coastal boundary checks.
+- [x] Implement exact COG projection lookup and four-state result mapping.
+- [x] Keep location, scenario, horizon, and release in shareable URL state.
+- [x] Add versioned service-worker caches and honest offline indicators.
+- [x] Add graceful basemap failure; projection lookup must remain functional.
+- [x] Add `/about/architecture` with release/provenance/quality evidence.
+- [x] Remove runtime requests to `/geocode`, `/assess`, and `/config`.
 
 Exit evidence:
 

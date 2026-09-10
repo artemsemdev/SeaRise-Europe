@@ -33,6 +33,46 @@ def _workflow_event_paths(workflow: str, event: str, next_event: str) -> set[str
 
 
 class ChangedComponentRoutingTests(unittest.TestCase):
+    def test_product_contract_changes_always_run_web_checks(self) -> None:
+        for path in (
+            "docs/product/PRD.md",
+            "docs/product/CONTENT_GUIDELINES.md",
+            "docs/product/COASTAL_ATLAS_DESIGN.md",
+            "docs/product/COASTAL_ATLAS_PRD.md",
+            "docs/architecture/adr/ADR-028-coastal-atlas-adoption.md",
+        ):
+            with self.subTest(path=path):
+                self.assertTrue(classify_paths([path])["web"])
+
+    def test_atlas_raster_adapter_routes_both_consumers(self) -> None:
+        outputs = classify_paths(["scripts/atlas/europe_raster_service.py"])
+        self.assertTrue(outputs["web"])
+        self.assertTrue(outputs["pipeline"])
+        self.assertFalse(outputs["release"])
+        self.assertFalse(outputs["repository_removal"])
+
+    def test_pipeline_lints_adapter_and_runs_its_deterministic_tests(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        pipeline = workflow.split("  pipeline:\n", maxsplit=1)[1].split(
+            "\n  ar6-release-evidence:", maxsplit=1
+        )[0]
+        self.assertIn("working-directory: src/pipeline", pipeline)
+        self.assertIn("run: ruff check . ../../scripts/atlas", pipeline)
+        self.assertIn("run: pytest tests/ -v", pipeline)
+        self.assertTrue(
+            classify_paths(["src/pipeline/tests/atlas/test_europe_raster_service.py"])[
+                "pipeline"
+            ]
+        )
+        self.assertNotIn("npm run local:e2e", workflow)
+
+    def test_atlas_cartography_routes_web_without_source_release_build(self) -> None:
+        outputs = classify_paths(["data/cartography/europe-display.geojson"])
+        self.assertTrue(outputs["web"])
+        self.assertFalse(outputs["pipeline"])
+        self.assertFalse(outputs["release"])
+
     def test_static_quality_routes_every_direct_release_fixture_input(self) -> None:
         root = Path(__file__).resolve().parents[2]
         workflow = (root / ".github/workflows/static-quality.yml").read_text(
@@ -347,7 +387,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         )
         validation = web.split("- name: Validate static target", maxsplit=1)[1]
         validation = validation.split("\n      - name:", maxsplit=1)[0]
-        self.assertIn("GH_TOKEN: ${{ github.token }}", validation)
+        self.assertNotIn("GH_TOKEN", validation)
         self.assertIn("run: npm run web:check", validation)
 
     def test_repository_removal_job_enforces_committed_lifecycle_and_profile(
@@ -359,7 +399,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         job = _workflow_job(workflow, "repository-removal-v2", "ci-gate")
         gate = workflow.split("  ci-gate:", maxsplit=1)[1]
 
-        self.assertIn("needs.changes.outputs.repository_removal == 'true'", job)
+        self.assertIn("if: needs.changes.outputs.repository_removal == 'true' || needs.changes.outputs.web == 'true'", job)
         self.assertIn("contents: read\n      issues: read", job)
         self.assertIn("fetch-depth: 0", job)
         self.assertIn("persist-credentials: false", job)
@@ -367,7 +407,9 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertIn("python -m pytest tests/repository-removal", job)
         self.assertIn("tests/harness/test_changed_suites.py", job)
         self.assertIn("validate_supply_chain_contract.py static-profile", job)
-        self.assertIn("github.event.pull_request.base.sha", job)
+        self.assertIn("python scripts/repository/validate_post_cutover.py", job)
+        self.assertIn('--head-commit "${APPLIED_COMMIT}"', job)
+        self.assertNotIn("validate_issue71_removal.py ci", job)
         self.assertIn("--verify-owner-comment", job)
         self.assertIn("GH_TOKEN: ${{ github.token }}", job)
         self.assertIn("- repository-removal-v2", gate)

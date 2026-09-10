@@ -19,6 +19,10 @@
     "web:serve:offline-lifecycle": "npm run serve:offline-lifecycle --workspace @searise/web",
     "web:e2e:offline-lifecycle": "npm run e2e:offline-lifecycle --workspace @searise/web",
     "web:e2e": "npm run e2e --workspace @searise/web",
-    "web:check": "npm run web:lint && npm run web:type-check && npm run web:test && npm run web:build"
+    "web:check": "npm run web:lint && npm run web:type-check && npm run web:test && npm run web:build",
+    "local:start": "npm run dev --workspace @searise/web -- --mode real-local --host 127.0.0.1 --port 4181 --strictPort",
+    "local:build": "npm run build:real-local --workspace @searise/web",
+    "local:serve": "npm run serve:real-local --workspace @searise/web",
+    "local:e2e": "npm run e2e:real-local --workspace @searise/web"
   }
 }

@@ -73,6 +73,7 @@ const outputIsolation = validateStaticOutputIsolation({
 });
 const required = [
   resolve(dist, "index.html"),
+  resolve(dist, "projections/index.html"),
   resolve(dist, "about/architecture/index.html"),
   resolve(dist, "releases", releaseId, "manifest.json"),
   resolve(dist, "vite-manifest.json"),
@@ -84,7 +85,7 @@ for (const path of required) {
   if (!paths.includes(path)) throw new Error(`Static build is missing ${relative(dist, path)}`);
 }
 
-for (const entry of ["index.html", "about/architecture/index.html"]) {
+for (const entry of ["index.html", "projections/index.html", "about/architecture/index.html"]) {
   const html = readFileSync(resolve(dist, entry), "utf8");
   const csp = html.match(/<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]+)"\s*\/?\s*>/i)?.[1];
   if (csp !== expectedCsp) {
@@ -103,7 +104,11 @@ for (const entry of ["index.html", "about/architecture/index.html"]) {
     throw new Error(`${entry} does not embed its initial render-blocking stylesheet`);
   }
   const fontPreloads = [...html.matchAll(/<link rel="preload" href="(\/assets\/(?:instrument-sans-latin-wght-normal|instrument-serif-latin-400-normal)-[A-Za-z0-9_-]+\.woff2)" as="font" type="font\/woff2" crossorigin>/gu)];
-  if (fontPreloads.length !== 2 || fontPreloads.some(([, path]) => !paths.includes(resolve(dist, `.${path}`)))) {
+  if (entry === "index.html") {
+    if (/@font-face\b/iu.test(html) || /<link[^>]+as="font"/u.test(html)) {
+      throw new Error("Atlas must use system fonts without font preloads");
+    }
+  } else if (fontPreloads.length !== 2 || fontPreloads.some(([, path]) => !paths.includes(resolve(dist, `.${path}`)))) {
     throw new Error(`${entry} does not preload both initial Latin Flight fonts`);
   }
 }
@@ -154,18 +159,36 @@ if (/skipWaiting\s*\(|clients\s*\.\s*claim\s*\(/u.test(serviceWorker)) {
 const expectedPrecacheFiles = new Set();
 function collectPrecache(key) {
   const entry = viteManifest[key];
-  if (!entry || expectedPrecacheFiles.has(entry.file)) return;
+  if (!entry) throw new Error(`Projection manifest import is missing: ${key}`);
+  if (expectedPrecacheFiles.has(entry.file)) return;
   expectedPrecacheFiles.add(entry.file);
   for (const css of entry.css ?? []) expectedPrecacheFiles.add(css);
   for (const asset of entry.assets ?? []) expectedPrecacheFiles.add(asset);
   for (const imported of entry.imports ?? []) collectPrecache(imported);
   for (const imported of entry.dynamicImports ?? []) collectPrecache(imported);
 }
-const precacheMainKey = Object.entries(viteManifest).find(([, entry]) =>
-  entry.dynamicImports?.includes("src/components/map/MapExplorer.tsx"),
-)?.[0];
-if (!precacheMainKey) throw new Error("Vite manifest has no precache application entry");
+const precacheMainKey = "src/main.tsx";
+if (!viteManifest[precacheMainKey]?.isEntry || viteManifest[precacheMainKey].src !== precacheMainKey) {
+  throw new Error("Vite manifest has no named projection application entry");
+}
 collectPrecache(precacheMainKey);
+const projectionDeclaredFiles = new Set(expectedPrecacheFiles);
+const atlasEntry = viteManifest["src/atlas/main.tsx"];
+if (!atlasEntry?.isEntry || atlasEntry.src !== "src/atlas/main.tsx") {
+  throw new Error("Vite manifest has no named Atlas application entry");
+}
+const atlasDeclaredFiles = new Set();
+function collectAtlasGraph(key) {
+  const entry = viteManifest[key];
+  if (!entry) throw new Error(`Atlas manifest import is missing: ${key}`);
+  if (atlasDeclaredFiles.has(entry.file)) return;
+  atlasDeclaredFiles.add(entry.file);
+  for (const css of entry.css ?? []) atlasDeclaredFiles.add(css);
+  for (const asset of entry.assets ?? []) atlasDeclaredFiles.add(asset);
+  for (const imported of [...entry.imports ?? [], ...entry.dynamicImports ?? []]) collectAtlasGraph(imported);
+}
+collectAtlasGraph("src/atlas/main.tsx");
+
 const shellAssetExtensions = new Set([
   ".css", ".html", ".js", ".json", ".png", ".svg", ".wasm", ".woff", ".woff2",
 ]);
@@ -192,8 +215,13 @@ while (foundReference) {
     }
   }
 }
+for (const file of expectedPrecacheFiles) {
+  if (atlasDeclaredFiles.has(file) && !projectionDeclaredFiles.has(file)) {
+    throw new Error(`Atlas-only asset cannot enter the independent projection shell inventory: ${file}`);
+  }
+}
 const expectedPrecachePaths = [
-  "/",
+  "/projections/index.html",
   `/${applicationBuildIdentityFile}`,
   ...[...expectedPrecacheFiles].map((path) => `/${path}`),
   `/releases/${releaseId}/manifest.json`,
@@ -232,7 +260,7 @@ if (
   embedded.contractVersion !== 3 ||
   JSON.stringify(embedded.entries) !== JSON.stringify(expectedPrecacheEntries) ||
   embedded.precacheSetSha256 !== expectedPrecacheHash ||
-  embedded.entries.some(({ path }) => path.startsWith("/about/") ||
+  embedded.entries.some(({ path }) => path === "/" || path === "/index.html" || /^\/atlas-data(?:[/?#]|$)/u.test(path) || path.startsWith("/about/") ||
     (path.startsWith("/releases/") && path !== buildIdentity.manifestPath &&
       path !== rangeIntegrityBootstrapPath(releaseId)))
 ) throw new Error("Service worker embedded precache differs from the independent shell inventory");
@@ -247,10 +275,7 @@ if (requiredRecursiveShell.some((path) => !path || !embedded.entries.some((entry
 }
 assertSameBuildIdentity(buildIdentity, embedded.buildIdentity, "service worker");
 validateApplicationBuildIdentity({ dist, expectedIdentity: buildIdentity });
-const mainEntry = Object.values(viteManifest).find((entry) =>
-  entry.dynamicImports?.includes("src/components/map/MapExplorer.tsx"),
-);
-if (!mainEntry) throw new Error("Vite manifest has no static application entry");
+const mainEntry = viteManifest["src/main.tsx"];
 const initialFiles = new Set();
 function collectInitial(entry) {
   if (!entry || initialFiles.has(entry.file)) return;
@@ -314,14 +339,35 @@ if (initialJavascript > 250 * 1024) {
   throw new Error(`Initial JavaScript exceeds the 250 KiB Brotli budget: ${initialJavascript}`);
 }
 
+if (embedded.entries.some(({ path }) => path === `/${atlasEntry.file}`)) {
+  throw new Error("Atlas application cannot enter the projection shell precache");
+}
+const atlasInitialFiles = new Set();
+function collectAtlasInitial(key) {
+  const entry = viteManifest[key];
+  if (!entry) throw new Error(`Atlas manifest import is missing: ${key}`);
+  if (atlasInitialFiles.has(entry.file)) return;
+  atlasInitialFiles.add(entry.file);
+  for (const imported of entry.imports ?? []) collectAtlasInitial(imported);
+}
+collectAtlasInitial("src/atlas/main.tsx");
+const atlasInitialJavascript = assets
+  .filter((asset) => asset.path.endsWith(".js") && atlasInitialFiles.has(asset.path))
+  .reduce((total, asset) => total + asset.brotliBytes, 0);
+if (atlasInitialJavascript > 250 * 1024) {
+  throw new Error(`Initial Atlas JavaScript exceeds the 250 KiB Brotli budget: ${atlasInitialJavascript}`);
+}
+
 const report = {
   ...buildIdentity,
   outputIsolation,
-  staticRoutes: ["/", "/about/architecture/"],
+  staticRoutes: ["/", "/projections/", "/about/architecture/"],
   bundleIsolation: {
     initialFiles: [...initialFiles].sort(),
     initialJavascriptBrotliBytes: initialJavascript,
     lazyMapFiles: mapFiles.sort(),
+    atlasInitialFiles: [...atlasInitialFiles].sort(),
+    atlasInitialJavascriptBrotliBytes: atlasInitialJavascript,
   },
   lazyWorkerAssets: lazySearchPaths.map((path) => relative(dist, path)),
   serviceWorker: {

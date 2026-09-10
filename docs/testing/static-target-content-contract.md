@@ -1,70 +1,63 @@
-# Static target content contract
+# Application content contract
 
-ADR-024 defines one projection product with exactly four scientific outcomes:
-`ProjectionAvailable`, `DataUnavailable`, `OutOfScope`, and
-`UnsupportedGeography`. The target application reports regional relative
-sea-level change and never restores the rejected binary terrain-comparison
-product through copy, code, tests, or build output.
+[ADR-028](../architecture/adr/ADR-028-coastal-atlas-adoption.md) defines the
+accepted main coastal atlas target. ADR-024 continues to define the retained
+AR6 projection reference with its four scientific outcomes. Source-backed
+CoCliCo depth values and AR6 regional relative-level values are different
+contracts, not interchangeable result states.
 
-`src/web/scripts/check-target-content.mjs` runs during both lint and production
-build. It scans production web source, active project documentation, and emitted
-JavaScript/CSS/HTML for obsolete outcome identifiers and affirmative exposure,
-terrain-comparison, inundation, or property-risk product claims. Built assets
-are scanned separately so source transforms or dependencies cannot reintroduce
-the language after the source check.
+`src/web/scripts/check-target-content.mjs` runs during lint and production
+build. The explicit `src/web/src/atlas/` source and named active atlas documents
+may describe source-backed coastal inundation. The projection source,
+projection reference documents, and all other paths retain projection-only
+terminology checks. Noncanonical paths cannot acquire atlas scope.
 
-A second, product-copy-only layer scans production web source and emitted
-assets, but not guidance that must discuss rejected wording. It rejects
-certainty about flooding, safety, risk, personal property, or precision;
-unsupported promises about complete settlement coverage, permanent cost, or
-fully offline operation; relative `+N years` horizons; forecast-model framing;
-five-state target models; and affirmative flood-probability statements.
+Legacy binary outcome identifiers, property-risk scores, and unsupported
+certainty remain prohibited in both products. Product copy also rejects
+fabricated flood probability, safety or precision guarantees, unqualified
+coverage/offline/cost promises, and relative year horizons. Tests demonstrate
+both the permitted source-backed terms and continued rejection of unsafe claims.
 
-The scanner executes mutation controls for every category on every run. A
-future change that weakens either the target-domain exclusions or the stricter
-product-copy rules fails before repository content is accepted.
+The current emitted build still belongs to the projection application and is
+scanned under its existing rules. The primary-entry migration must explicitly
+update emitted-artifact scope and output isolation together. Adding a source
+exception does not change the application entry or approve any published data.
 
-## Canonical Flight reference exception
+## Retained Flight reference
 
-`docs/product/Mock/SeaRise-Flight.html` is the active canonical visual and
-interaction reference, not historical-only evidence. Its layout, information
-hierarchy, map-first composition, controls, responsive behavior, and
-interaction character are reusable target requirements. The self-contained
-mock also contains rejected prototype science that cannot be scanned as target
-product copy or copied into the production bundle.
+`docs/product/Mock/SeaRise-Flight.html` is scoped to the retained AR6 projection
+application. The coastal atlas uses its separate accepted design contract.
+The mock body still contains rejected prototype science; its exact-byte SHA-256
+and annotation must preserve the four-outcome interpretation before the scanner
+excludes the mock body. It is never copied into the application build.
 
-The scanner therefore excludes the mock body from the target-domain text scan
-only after its pre-document annotation proves all of the following:
-
-- active canonical visual and interaction authority;
-- explicit preservation of the Flight composition and behavior;
-- `exposed` and `notexposed` map to `ProjectionAvailable`;
-- `unavailable` maps to `DataUnavailable`;
-- `outofscope` maps to `OutOfScope`;
-- missing `UnsupportedGeography` must be added;
-- technical failures remain outside the scientific outcome domain.
-
-The gate also requires the active preservation contract and four-outcome map in
-`MOCK_REQUIREMENTS_MAP.md`, and verifies that its declared SHA-256 matches the
-exact canonical mock bytes. Removing or weakening any marker or changing the
-mock without updating its reviewed digest fails the content gate. This narrow
-exception authorizes reuse of visual and interaction design, not binary
-exposure, terrain comparison, modeled-water/flood meaning, hazard claims,
-fixture facts, or product copy. The canonical mock is never copied into the
-production build.
+The annotation identifies the AR6 reference, preserves its layout/interaction
+character, maps the old mock cards to the four AR6 outcomes, and keeps technical
+failures outside the scientific outcome domain. `MOCK_REQUIREMENTS_MAP.md`
+records the same scope and digest. Mutation checks reject broadened authority,
+missing semantic mappings, and a digest that no longer matches the mock bytes.
 
 ## Historical evidence allowlist
 
 Historical terminology is never exempted by directory. Readiness may read
 `contracts/repository-removal/v1/historical-allowlist.preapproval.json`, but
 final mode refuses preapproval authority. Final mode requires the committed
-`historical-allowlist.json` and a successful offline validation of the complete
-inventory, evidence-receipt, owner-decision, comment-identity, audited-object,
-and hash chain. Preapproval binds each exact repository path to its current Git
-blob only and deliberately carries no commit/tree audit claim. Final approval
-binds that path to both the current and audited Git blob SHA plus one constrained
-rule. The scanner rejects schema-shape, ID, commit/tree, duplicate,
+`historical-allowlist.json` and integrity verification against the pinned
+completed removal evidence. CI separately revalidates the complete approval
+chain, including live owner comments. Preapproval binds each exact repository
+path to its current Git blob only and deliberately carries no commit/tree
+audit claim. Final approval binds that path to both the current and audited Git
+blob SHA plus one constrained rule. The scanner rejects schema-shape, ID,
+commit/tree, duplicate,
 active-authority, and rule/path drift.
+
+The current source gate invokes `validate_post_cutover.py --evidence-only` with
+standard-library Python and local Git. It recomputes authority blob digests,
+requires unchanged historical authority and absent retired-runtime paths, and
+fails on missing historical objects without fetching. It proves integrity
+relative to the reviewed completed receipt; it performs no live attestation.
+CI explicitly uses `--verify-owner-comment` for repository-authority or web
+changes, retaining the unchanged historical validator and live GitHub check.
 
 The preapproval document is evidence classification only. It does not approve
 deletion, publication, or an inventory disposition. The final repository-
@@ -75,7 +68,8 @@ property-risk, inundation, or other product claims. The separately marked
 historical section of `docs/methodology.md` continues to use its narrow in-file
 boundary.
 
-ADR-024 remains active authoritative policy, never historical evidence. Its
+ADR-024 remains authoritative for its projection release contract, never a
+blanket atlas content prohibition or historical terminology exemption. Its
 two obsolete outcome identifiers are accepted only inside the exact sentence
 that says they do not appear in an ADR-024 release. The loader is prepared for
 the schema's forthcoming exact `canonical-design-reference` rule for
@@ -111,9 +105,14 @@ every remaining pending-removal reference into a failure and also rejects any
 unclassified reference. It is the Phase 2 final clean-repository gate. Printed
 occurrence counts are diagnostics only; they are not an inventory-completeness
 claim. The scanner and its mutation suite necessarily contain the literal
-policy tokens they reject. They are the only executable policy-definition
-trust roots: final mode requires their current Git blobs to equal the blobs in
-the owner-approved audited commit, whose tree is bound by the approval chain.
+policy tokens they reject. They remain the only executable policy-definition
+exceptions. Under [ADR-027](../architecture/adr/ADR-027-post-cutover-application-evolution.md),
+their approved historical versions remain bound to the completed removal
+receipt, while their current versions may evolve through reviewed changes and
+mutation tests. The shared post-cutover adapter verifies unchanged current
+historical authority and continued absence of the removed runtime; its live CI
+mode also revalidates the original approval chain. Neither mode waives any
+current content or dependency rule.
 
 Static-output isolation independently rejects both unversioned and `/v1/`
 forms of `/assess`, `/geocode`, and `/config`. Only exact

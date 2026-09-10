@@ -37,8 +37,9 @@ ANNOTATION = (
 )
 TARGET = "linux-x86-64-cp311"
 NPM_LOCK = REPOSITORY_ROOT / "package-lock.json"
-NPM_ARTIFACT = REPOSITORY_ROOT / "contracts/supply-chain/v1/sboms/frontend-npm.cdx.json"
+NPM_ARTIFACT = REPOSITORY_ROOT / "contracts/supply-chain/v2/sboms/static-web-npm.cdx.json"
 NPM_LOGICAL_PATH = "package-lock.json"
+NPM_SCOPE = "static-web-npm-lock-only"
 
 
 def _partials(parent: Path) -> list[Path]:
@@ -120,7 +121,7 @@ def test_cli_generates_and_validates_one_explicit_target(
     assert not missing.exists()
 
 
-def test_npm_cli_generates_and_validates_real_frontend_bytes(
+def test_npm_cli_generates_and_validates_active_static_web_bytes(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -132,13 +133,15 @@ def test_npm_cli_generates_and_validates_real_frontend_bytes(
         str(REPOSITORY_ROOT),
         "--logical-path",
         NPM_LOGICAL_PATH,
+        "--scope",
+        NPM_SCOPE,
     ]
 
     assert main(["npm-sbom", *common, "--output", str(output)]) == 0
-    assert "generated 340 npm components" in capsys.readouterr().out
+    assert "generated 341 npm components" in capsys.readouterr().out
     assert output.read_bytes() == NPM_ARTIFACT.read_bytes()
     assert main(["npm-sbom-validate", *common, "--sbom", str(output)]) == 0
-    assert "validated 340 npm components" in capsys.readouterr().out
+    assert "validated 341 npm components" in capsys.readouterr().out
 
 
 def test_parent_inode_swap_fails_without_publishing_to_either_directory(

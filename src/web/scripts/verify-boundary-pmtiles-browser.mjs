@@ -21,8 +21,11 @@ if (!process.argv[2] || !process.argv[3]) {
 
 const packageLockBytes = readFileSync(resolve(repositoryRoot, "package-lock.json"));
 const packageLock = JSON.parse(packageLockBytes);
-const maplibreBytes = readFileSync(
-  resolve(repositoryRoot, "node_modules/maplibre-gl/dist/maplibre-gl.js"),
+const maplibreModules = new Map(
+  ["maplibre-gl.mjs", "maplibre-gl-shared.mjs", "maplibre-gl-worker.mjs"].map((name) => [
+    `/${name}`,
+    readFileSync(resolve(repositoryRoot, "node_modules/maplibre-gl/dist", name)),
+  ]),
 );
 const pmtilesBytes = readFileSync(resolve(repositoryRoot, "node_modules/pmtiles/dist/pmtiles.js"));
 const roles = [
@@ -75,9 +78,9 @@ const artifacts = new Map(
 );
 const server = createServer((request, response) => {
   const url = new URL(request.url, "http://127.0.0.1");
-  if (url.pathname === "/maplibre.js") {
+  if (maplibreModules.has(url.pathname)) {
     response.writeHead(200, { "Content-Type": "text/javascript" });
-    response.end(maplibreBytes);
+    response.end(maplibreModules.get(url.pathname));
   } else if (url.pathname === "/pmtiles.js") {
     response.writeHead(200, { "Content-Type": "text/javascript" });
     response.end(pmtilesBytes);
@@ -88,7 +91,11 @@ const server = createServer((request, response) => {
     response.writeHead(200, { "Content-Type": "text/html" });
     response.end(`<!doctype html>
       <style>html,body,#map{height:100%;width:100%;margin:0;background:transparent}</style>
-      <script src="/maplibre.js"></script><script src="/pmtiles.js"></script>
+      <script type="module">
+        import * as maplibregl from "/maplibre-gl.mjs";
+        globalThis.maplibregl = maplibregl;
+      </script>
+      <script src="/pmtiles.js"></script>
       <div id="map"></div>`);
   }
 });
@@ -97,14 +104,20 @@ await once(server, "listening");
 const address = server.address();
 if (!address || typeof address === "string") throw new Error("browser harness did not bind TCP");
 const origin = `http://127.0.0.1:${address.port}`;
-const browser = await chromium.launch({ headless: true });
+let browser;
 const samples = [];
 let browserVersion;
 try {
+  browser = await chromium.launch({ headless: true });
   browserVersion = browser.version();
   const context = await browser.newContext({ viewport: { width: 512, height: 512 } });
   const page = await context.newPage();
+  page.on("pageerror", (error) => console.error(`Boundary page error: ${error.message}`));
+  page.on("console", (message) => {
+    if (message.type() === "error") console.error(`Boundary browser error: ${message.text()}`);
+  });
   await page.goto(origin);
+  await page.waitForFunction(() => typeof globalThis.maplibregl?.Map === "function");
   for (const role of roles) {
     for (const zoom of zooms) {
       const result = await page.evaluate(
@@ -117,7 +130,7 @@ try {
               center: [6, 52],
               zoom,
               attributionControl: false,
-              preserveDrawingBuffer: true,
+              canvasContextAttributes: { preserveDrawingBuffer: true },
               style: {
                 version: 8,
                 sources: {
@@ -160,13 +173,21 @@ try {
                   feature.properties.publication_eligible === false &&
                   feature.properties.hazard_extent_claim === false,
               );
-              resolveSample({ featureCount: features.length, safe });
+              const canvas = map.getCanvas();
+              const gl = canvas.getContext("webgl2");
+              const pixels = new Uint8Array(canvas.width * canvas.height * 4);
+              gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+              let renderedPixelCount = 0;
+              for (let offset = 0; offset < pixels.length; offset += 4) {
+                if (pixels[offset + 2] > 0 && pixels[offset + 3] > 0) renderedPixelCount += 1;
+              }
+              resolveSample({ featureCount: features.length, safe, renderedPixelCount });
               globalThis.__seariseBoundaryMap = map;
             });
           }),
         { origin, role, zoom },
       );
-      if (result.featureCount <= 0 || !result.safe) {
+      if (result.featureCount <= 0 || !result.safe || result.renderedPixelCount <= 0) {
         throw new Error(`unsafe or empty browser render for ${role.role} z${zoom}`);
       }
       const screenshot = await page.locator("#map canvas").screenshot({ type: "png" });
@@ -174,6 +195,7 @@ try {
         role: role.role,
         zoom,
         decodedRenderedFeatureCount: result.featureCount,
+        renderedPixelCount: result.renderedPixelCount,
         screenshot: { byteSize: screenshot.length, sha256: sha256(screenshot) },
       });
       await page.evaluate(() => {
@@ -185,7 +207,7 @@ try {
   }
   await context.close();
 } finally {
-  await browser.close();
+  await browser?.close();
   server.close();
   await once(server, "close");
 }

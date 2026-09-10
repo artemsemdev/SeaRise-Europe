@@ -5,13 +5,56 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { deriveCanonicalFlightDigest, validateStaticOutputIsolation } from "./static-output-isolation.mjs";
+import { inlineInitialStyles } from "./static-delivery-assets.mjs";
 
 const RELEASE = "searise-europe-v1.0.0-20260810-c096aeab4e09";
+
+function styleFixture() {
+  const { dist } = fixture();
+  const atlasCss = ".atlas-app {font-family: system-ui}";
+  const flightCss = '@font-face{src:url(/assets/instrument-sans-latin-wght-normal-a.woff2)}@font-face{src:url(/assets/instrument-serif-latin-400-normal-b.woff2)}';
+  writeFileSync(resolve(dist, "assets/atlas.css"), atlasCss);
+  writeFileSync(resolve(dist, "assets/context.css"), ".map {height:100%}");
+  writeFileSync(resolve(dist, "assets/flight.css"), flightCss);
+  writeFileSync(resolve(dist, "index.html"), '<link rel="stylesheet" crossorigin href="/assets/atlas.css"><link rel="stylesheet" crossorigin href="/assets/context.css">');
+  for (const document of ["projections/index.html", "about/architecture/index.html"]) {
+    writeFileSync(resolve(dist, document), '<link rel="stylesheet" crossorigin href="/assets/flight.css">');
+  }
+  return { dist, atlasCss, flightCss };
+}
+
+describe("separate initial Atlas and projection styles", () => {
+  it("embeds Atlas system styles in order and preserves both Flight font preloads", () => {
+    const { dist, atlasCss, flightCss } = styleFixture();
+    expect(inlineInitialStyles(dist)).toEqual({ documents: 3, stylesheet: "/assets/flight.css" });
+    const atlas = readFileSync(resolve(dist, "index.html"), "utf8");
+    expect(atlas).toContain(`${atlasCss}\n.map {height:100%}`);
+    expect(atlas).not.toMatch(/rel="stylesheet"|as="font"/);
+    for (const document of ["projections/index.html", "about/architecture/index.html"]) {
+      const html = readFileSync(resolve(dist, document), "utf8");
+      expect(html).toContain(flightCss);
+      expect(html.match(/as="font"/gu)).toHaveLength(2);
+      expect(html).not.toContain(".atlas-app");
+    }
+  });
+
+  it.each([
+    ["assets/atlas.css", "@font-face{src:url(private.woff2)}", /system fonts/],
+    ["assets/atlas.css", "</style><script>bad()</script>", /cannot be safely embedded/],
+    ["assets/flight.css", "body{font-family:system-ui}", /exact Latin Flight fonts/],
+    ["about/architecture/index.html", '<link rel="stylesheet" crossorigin href="/assets/atlas.css">', /projection routes do not share/],
+  ])("rejects invalid initial style contract in %s", (path, content, expected) => {
+    const { dist } = styleFixture();
+    writeFileSync(resolve(dist, path), content);
+    expect(() => inlineInitialStyles(dist)).toThrow(expected);
+  });
+});
 
 function fixture() {
   const dist = mkdtempSync(resolve(tmpdir(), "static-output-isolation-"));
   const files = {
     "index.html": "<main>Flight</main>",
+    "projections/index.html": "<main>Retained projections</main>",
     "about/architecture/index.html": "<main>Architecture</main>",
     "vite-manifest.json": "{}",
     "service-worker.js": "self.addEventListener('fetch', () => {});",
@@ -39,7 +82,7 @@ function fixture() {
     releaseId: RELEASE,
     buildIdentityFile: "build-identity.json",
     applicationBuildIdentityFile: "assets/application-build-identity.js",
-    shellManifestPaths: ["/", "/assets/application-build-identity.js", "/assets/main-01234567.js"],
+    shellManifestPaths: ["/projections/index.html", "/assets/application-build-identity.js", "/assets/main-01234567.js"],
   };
   return { dist, options, paths: Object.keys(files).map((path) => resolve(dist, path)) };
 }
@@ -65,6 +108,11 @@ function addArchitectureEvidence(fixtureValue, mutation = {}) {
 }
 
 describe("static output isolation", () => {
+  it.each(["/", "/index.html", "/atlas-data", "/atlas-data/manifest.json", "/atlas-data?edition=local", "/atlas-data#catalog"])("rejects Atlas precache path %s", (path) => {
+    const { options, paths } = fixture();
+    expect(() => validateStaticOutputIsolation({ ...options, paths, shellManifestPaths: [...options.shellManifestPaths, path] }))
+      .toThrow(/Atlas documents and data cannot enter/);
+  });
   it("derives a changed canonical Flight digest from its matching requirements contract", () => {
     const first = Buffer.from("synthetic canonical Flight A");
     const second = Buffer.from("synthetic canonical Flight B");
@@ -82,6 +130,29 @@ describe("static output isolation", () => {
     writeFileSync(resolve(dist, "assets/main-01234567.js"),
       `export const scenarios = ["/releases/${RELEASE}/config/scenarios.json", "https://fixture.searise.invalid/releases/${RELEASE}/config/scenarios.json"];\n//# sourceMappingURL=main-01234567.js.map\n`);
     expect(validateStaticOutputIsolation({ ...options, paths }).allowedPaths).toContain("assets/main-01234567.js.map");
+  });
+
+  it("admits a referenced emitted worker, its source map, and sidecars without opening the assets directory", () => {
+    const { dist, options, paths } = fixture();
+    const worker = "assets/atlas-worker-123.js";
+    const workerMap = `${worker}.map`;
+    writeFileSync(resolve(dist, "assets/main-01234567.js"), `new Worker(new URL("/${worker}", import.meta.url));\n//# sourceMappingURL=main-01234567.js.map\n`);
+    for (const [path, content] of Object.entries({
+      [worker]: 'import("./worker-helper-456.js");\n//# sourceMappingURL=atlas-worker-123.js.map\n',
+      [workerMap]: "{}",
+      [`${worker}.br`]: "compressed sidecar is verified by inspect-build",
+      "assets/worker-helper-456.js": "export const helper = true;",
+    })) {
+      writeFileSync(resolve(dist, path), content);
+      paths.push(resolve(dist, path));
+    }
+    const allowed = validateStaticOutputIsolation({ ...options, paths }).allowedPaths;
+    expect(allowed).toContain(workerMap);
+    expect(allowed).toContain(`${worker}.br`);
+    const unreferenced = resolve(dist, "assets/unreferenced-private.js");
+    writeFileSync(unreferenced, "private output");
+    expect(() => validateStaticOutputIsolation({ ...options, paths: [...paths, unreferenced] }))
+      .toThrow(/unlisted files: assets\/unreferenced-private.js/);
   });
 
   it("rejects a symlink even when it appears at an otherwise safe output path", () => {

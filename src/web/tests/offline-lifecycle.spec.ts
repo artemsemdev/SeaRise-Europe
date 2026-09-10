@@ -4,6 +4,7 @@ const origin = "http://127.0.0.1:8093";
 const controlToken = "phase2-lifecycle-test-control-token-0001";
 const controlHeader = "x-searise-lifecycle-token";
 const releaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
+const projectionRoute = "/projections/";
 const appBuild = { A: "phase2-lifecycle-a", B: "phase2-lifecycle-b", C: "phase2-lifecycle-c" } as const;
 type Deployment = keyof typeof appBuild;
 type BrowserRequest = { method: string; path: string };
@@ -84,7 +85,7 @@ async function expectIdentity(page: Page, target: "controller" | "waiting", depl
 }
 
 async function bootInitialA(page: Page): Promise<void> {
-  await page.goto("/");
+  await page.goto(projectionRoute);
   await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
   await expect.poll(() => page.evaluate(async () => {
     const registration = await navigator.serviceWorker.getRegistration("/");
@@ -120,7 +121,7 @@ async function installWaiting(page: Page, deployment: Deployment): Promise<void>
 async function prepareUpdate(page: Page, second: Page, current: Deployment, next: Deployment): Promise<void> {
   await expectIdentity(page, "controller", current);
   await expectIdentity(page, "waiting", next);
-  await second.goto("/");
+  await second.goto(projectionRoute);
   await expect(second.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
   await expectIdentity(second, "controller", current);
   const controller = await workerIdentity(second, "controller");
@@ -156,9 +157,9 @@ async function naturallyActivate(
     let activated = false;
     try {
       // Probe controller activation on a same-origin control document that
-      // does not execute either deployment's application bundle. Loading `/`
-      // here could start an old shell under the newly activated worker and
-      // correctly trip mixed-authority fresh-boot protection.
+      // does not execute either deployment's application bundle. Loading the
+      // projection route here could start an old shell under the newly
+      // activated worker and correctly trip mixed-authority fresh-boot protection.
       await probe.goto("/lifecycle-probe.html", { waitUntil: "domcontentloaded" });
       await probe.evaluate(() => navigator.serviceWorker.ready);
       if (!await workerIdentity(probe, "controller")) {
@@ -172,7 +173,7 @@ async function naturallyActivate(
         // already verified controller.
         await probe.close();
         const fresh = await context.newPage();
-        await fresh.goto("/", { waitUntil: "domcontentloaded" });
+        await fresh.goto(projectionRoute, { waitUntil: "domcontentloaded" });
         await expectIdentity(fresh, "controller", deployment);
         await expect(fresh.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
         return fresh;
@@ -281,7 +282,7 @@ test("rotates A to B to C naturally, retains two generations, and reloads C offl
   await active.close();
   await setNetworkOffline(true);
   active = await context.newPage();
-  await active.goto("/", { waitUntil: "domcontentloaded" });
+  await active.goto(projectionRoute, { waitUntil: "domcontentloaded" });
   await expect(active.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
   await warmAssessment(active);
   await active.getByRole("radio", { name: "2100", exact: true }).check();

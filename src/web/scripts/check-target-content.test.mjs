@@ -1,18 +1,47 @@
 import { createHash } from "node:crypto";
 import { Buffer } from "node:buffer";
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   activeAuthoritativeDocument,
+  builtAtlasFiles,
   ownerCommentVerificationArguments,
+  postCutoverValidationArguments,
   readScanFile,
   scanContent,
+  scanProductCopy,
+  sourceProductScope,
+  validateFlightReferenceContract,
   validateHistoricalAllowlist,
 } from "./check-target-content.mjs";
 
 describe("built content containment", () => {
+  it("limits Atlas vocabulary to its named exclusive graph, keeping shared and projection assets strict", () => {
+    const manifest = {
+      "src/atlas/main.tsx": { src: "src/atlas/main.tsx", isEntry: true, file: "assets/atlas.js", imports: ["shared"], dynamicImports: ["atlas-map"], css: ["assets/atlas.css"] },
+      "src/main.tsx": { src: "src/main.tsx", isEntry: true, file: "assets/projections.js", imports: ["shared"] },
+      shared: { file: "assets/shared.js" },
+      "atlas-map": { file: "assets/coast.js" },
+      decoy: { file: "assets/atlas-looking-name.js" },
+    };
+    const atlas = builtAtlasFiles(manifest);
+    expect([...atlas].sort()).toEqual(["assets/atlas.css", "assets/atlas.js", "assets/coast.js", "index.html"]);
+    for (const path of ["assets/projections.js", "assets/shared.js", "assets/atlas-looking-name.js", "projections/index.html", "about/architecture/index.html"]) {
+      expect(atlas.has(path)).toBe(false);
+      expect(scanContent("Land modeled as exposed; inundation map", atlas.has(path) ? "atlas" : "projection")).toHaveLength(2);
+    }
+    expect(scanContent("Land modeled as exposed; inundation map", "atlas")).toHaveLength(0);
+    expect(scanProductCopy("This place is safe.")).toHaveLength(1);
+    const missing = { ...manifest };
+    delete missing["src/atlas/main.tsx"];
+    expect(() => builtAtlasFiles(missing)).toThrow(/no named application entry/);
+    expect(() => builtAtlasFiles({ ...manifest, "src/atlas/main.tsx": { ...manifest["src/atlas/main.tsx"], src: "src/main.tsx" } }))
+      .toThrow(/no named application entry/);
+    expect(() => builtAtlasFiles({ ...manifest, "atlas-map": undefined })).toThrow(/missing imported entry/);
+  });
+
   it("reads an external build root but rejects a symlink escape", () => {
     const builtRoot = mkdtempSync(resolve(tmpdir(), "target-content-built-"));
     const outsideRoot = mkdtempSync(resolve(tmpdir(), "target-content-outside-"));
@@ -60,6 +89,15 @@ function fixture(overrides = {}) {
 }
 
 describe("repository-removal validator capability", () => {
+  it("uses explicit offline evidence verification at the exact checked revision", () => {
+    expect(postCutoverValidationArguments("/repository", "a".repeat(40))).toEqual([
+      "/repository/scripts/repository/validate_post_cutover.py",
+      "--repository-root", "/repository",
+      "--head-commit", "a".repeat(40),
+      "--evidence-only",
+    ]);
+  });
+
   it("fails closed when owner-comment verification is unavailable", () => {
     expect(() => ownerCommentVerificationArguments(
       "usage: validator [--repository-root REPOSITORY_ROOT]",
@@ -153,5 +191,51 @@ describe("historical terminology allowlist", () => {
     expect(scanContent(activeAuthoritativeDocument(exact, path))).toHaveLength(0);
     expect(scanContent(activeAuthoritativeDocument(exact.replace("do\nnot appear", "remain available"), path)))
       .toHaveLength(2);
+  });
+});
+
+
+describe("coastal atlas and projection reference scopes", () => {
+  it("allows source-backed atlas terms without changing projection semantics", () => {
+    const content = "Land modeled as exposed. Coastal inundation map.";
+    expect(scanContent(content, "atlas")).toHaveLength(0);
+    expect(scanContent(content, "projection").map((item) => item.claim)).toEqual([
+      "affirmative-modeled-exposure", "inundation-product",
+    ]);
+    expect(() => scanContent(content, "unreviewed")).toThrow(/Unknown product scope/);
+  });
+
+  it.each([
+    "src/web/src/components/map/map-runtime.ts",
+    "src/web/src/atlas-research/experiment.ts",
+    "src/web/src/atlas/../components/map.ts",
+    "src/web/src/atlas//map.ts",
+    "docs/product/PRD.md",
+    "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
+    "docs/product/COASTAL_ATLAS_PRD-copy.md",
+  ])("keeps non-atlas or noncanonical paths in the projection scope: %s", (path) => {
+    expect(sourceProductScope(path)).toBe("projection");
+  });
+
+  it.each(["src/web/src/atlas/AtlasApp.tsx", "docs/product/COASTAL_ATLAS_PRD.md"])(
+    "recognizes the explicit atlas source: %s", (path) => {
+      expect(sourceProductScope(path)).toBe("atlas");
+    },
+  );
+
+  it("rejects legacy binary results and unsupported claims in the atlas too", () => {
+    expect(scanContent("ModeledExposureDetected. Property risk score.", "atlas"))
+      .toHaveLength(2);
+    expect(scanProductCopy("This location will flood. This place is safe. Flood probability is 20%."))
+      .toHaveLength(3);
+  });
+
+  it("retains the Flight reference meaning and exact mock integrity", () => {
+    const mock = readFileSync(resolve(process.cwd(), "../../docs/product/Mock/SeaRise-Flight.html"), "utf8");
+    const requirements = readFileSync(resolve(process.cwd(), "../../docs/product/Mock/MOCK_REQUIREMENTS_MAP.md"), "utf8");
+    expect(() => validateFlightReferenceContract(mock, requirements)).not.toThrow();
+    expect(() => validateFlightReferenceContract(mock.replace("AR6 PROJECTION REFERENCE ONLY.", "MAIN PRODUCT."), requirements))
+      .toThrow(/authority marker/);
+    expect(() => validateFlightReferenceContract(`${mock}\n`, requirements)).toThrow(/SHA-256/);
   });
 });

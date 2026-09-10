@@ -34,9 +34,10 @@ FIXTURE = (
 )
 REAL_LOCK = REPOSITORY_ROOT / "package-lock.json"
 REAL_ARTIFACT = (
-    REPOSITORY_ROOT / "contracts" / "supply-chain" / "v1" / "sboms" / "frontend-npm.cdx.json"
+    REPOSITORY_ROOT / "contracts" / "supply-chain" / "v2" / "sboms" / "static-web-npm.cdx.json"
 )
 REAL_LOGICAL_PATH = "package-lock.json"
+REAL_SCOPE = "static-web-npm-lock-only"
 LOGICAL_PATH = "contracts/supply-chain/v1/fixtures/sbom/npm-lock.synthetic.json"
 
 
@@ -167,8 +168,8 @@ def test_real_lock_generates_reachable_graph_and_validated_aliases() -> None:
                 reachable.add(reference)
                 pending.append(reference)
 
-    assert len(components) == 340
-    assert len(reachable) == 341
+    assert len(components) == 341
+    assert len(reachable) == 342
     by_path = _components_by_path(document)
     phosphor = by_path["node_modules/@phosphor-icons/react"]
     assert (phosphor["name"], phosphor["version"], phosphor["purl"]) == (
@@ -180,18 +181,19 @@ def test_real_lock_generates_reachable_graph_and_validated_aliases() -> None:
     assert "node_modules/@searise/web" not in by_path
 
 
-def test_checked_in_real_frontend_artifact_matches_exact_lock_authority() -> None:
+def test_checked_in_active_static_web_artifact_matches_exact_lock_authority() -> None:
     raw = REAL_ARTIFACT.read_bytes()
     document = validate_npm_sbom(
         REAL_ARTIFACT,
         REAL_LOCK,
         repository_root=REPOSITORY_ROOT,
         logical_path=REAL_LOGICAL_PATH,
+        scope=REAL_SCOPE,
     )
     root_properties = _properties(document["metadata"]["component"])
 
     assert raw == canonical_sbom_bytes(document)
-    assert len(document["components"]) == 340
+    assert len(document["components"]) == 341
     assert root_properties["org.searise.sbom.input.path"] == REAL_LOGICAL_PATH
     assert root_properties["org.searise.sbom.npm.workspace.path"] == "src/web"
     assert (
@@ -199,16 +201,17 @@ def test_checked_in_real_frontend_artifact_matches_exact_lock_authority() -> Non
         == hashlib.sha256(REAL_LOCK.read_bytes()).hexdigest()
     )
     assert root_properties["org.searise.sbom.production-claim"] == "false"
-    assert root_properties["org.searise.sbom.scope"] == "frontend-npm-lock-only"
+    assert root_properties["org.searise.sbom.scope"] == REAL_SCOPE
 
 
-def test_public_api_publishes_the_exact_real_frontend_artifact_once(tmp_path: Path) -> None:
+def test_public_api_publishes_the_exact_active_static_web_artifact_once(tmp_path: Path) -> None:
     output = tmp_path / "frontend-npm.cdx.json"
     document = publish_npm_sbom(
         output,
         REAL_LOCK,
         repository_root=REPOSITORY_ROOT,
         logical_path=REAL_LOGICAL_PATH,
+        scope=REAL_SCOPE,
     )
 
     assert output.read_bytes() == REAL_ARTIFACT.read_bytes() == canonical_sbom_bytes(document)
@@ -218,6 +221,7 @@ def test_public_api_publishes_the_exact_real_frontend_artifact_once(tmp_path: Pa
             REAL_LOCK,
             repository_root=REPOSITORY_ROOT,
             logical_path=REAL_LOGICAL_PATH,
+            scope=REAL_SCOPE,
         )
 
 

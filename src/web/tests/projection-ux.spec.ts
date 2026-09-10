@@ -134,7 +134,7 @@ function monitorApplicationBoundary(page: Page) {
 
 test("real browser chain renders the four exact scientific outcomes", async ({ page }, testInfo) => {
   const boundary = monitorApplicationBoundary(page);
-  await page.goto("/");
+  await page.goto("/projections/");
   await ready(page);
 
   await selectSettlement(page, "Málaga", /Málaga.*Andalucía, ES/i);
@@ -160,7 +160,7 @@ test("real browser chain renders the four exact scientific outcomes", async ({ p
   await expectNoSeriousAxeFindings(page);
   await attachStableState(page, testInfo, "unsupported-geography");
 
-  await page.goto(`/?release=${RELEASE_ID}&scenario=ssp2-45&horizon=2050&lat=62&lon=44`);
+  await page.goto(`/projections/?release=${RELEASE_ID}&scenario=ssp2-45&horizon=2050&lat=62&lon=44`);
   await expectProjectionPhase(page, "result");
   await expect(outcome(page)).toHaveAttribute("data-outcome", "DataUnavailable");
   await expect(outcome(page).getByText(RESULT_CAVEAT)).toBeVisible();
@@ -190,7 +190,7 @@ test("first selected-place technical failure receives focus after the transition
     await route.continue();
   });
 
-  await page.goto("/");
+  await page.goto("/projections/");
   await ready(page);
   const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
   await search.fill("Málaga");
@@ -223,7 +223,7 @@ test("first selected-place integrity failure receives focus after the transition
     await route.fulfill({ response, body: bytes });
   });
 
-  await page.goto("/");
+  await page.goto("/projections/");
   await ready(page);
   const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
   await search.fill("Málaga");
@@ -246,7 +246,7 @@ test("all nine accepted projections keep exact COG values and PMTiles identity",
     if (pathname.endsWith(".pmtiles")) pmtiles.add(pathname);
   });
 
-  await page.goto("/");
+  await page.goto("/projections/");
   await ready(page);
   await selectSettlement(page, "Málaga", /Málaga.*Andalucía, ES/i);
   const map = page.getByRole("region", { name: /interactive visual map/i });
@@ -285,7 +285,7 @@ test("all nine accepted projections keep exact COG values and PMTiles identity",
 });
 
 test("corrupt real COG range is a technical integrity failure and preserves the accepted result", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/projections/");
   await ready(page);
   await selectSettlement(page, "Málaga", /Málaga.*Andalucía, ES/i);
   await page.getByRole("radio", { name: /ssp5-85/ }).check();
@@ -324,7 +324,7 @@ test("corrupt real COG range is a technical integrity failure and preserves the 
 });
 
 test("one-time 503 recovers only after explicit same-selection retry", async ({ page }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/projections/");
   await ready(page);
   await selectSettlement(page, "Málaga", /Málaga.*Andalucía, ES/i);
   await page.getByRole("radio", { name: /ssp1-26/ }).check();
@@ -358,7 +358,7 @@ test("one-time 503 recovers only after explicit same-selection retry", async ({ 
 });
 
 test("rapid control and map commands cannot publish stale mixed state", async ({ page }, testInfo) => {
-  await page.goto("/?campaign=issue-59");
+  await page.goto("/projections/?campaign=issue-59");
   await ready(page);
   await selectSettlement(page, "Málaga", /Málaga.*Andalucía, ES/i);
   await page.getByRole("radio", { name: /ssp5-85/ }).check();
@@ -413,7 +413,7 @@ test("rapid control and map commands cannot publish stale mixed state", async ({
 });
 
 test("share, reload, popstate, reset, and release scope preserve one URL selection", async ({ page }) => {
-  await page.goto("/?campaign=issue-59");
+  await page.goto("/projections/?campaign=issue-59");
   await ready(page);
   await selectSettlement(page, "Málaga", /Málaga.*Andalucía, ES/i);
   await page.getByRole("button", { name: /share accepted result/i }).click();
@@ -470,7 +470,7 @@ test("camera motion can be skipped without cancelling or fabricating the assessm
     await route.continue();
   });
 
-  await page.goto("/");
+  await page.goto("/projections/");
   await ready(page);
   const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
   await search.fill("Málaga");
@@ -521,7 +521,7 @@ test("a superseded search response cannot replace the newest Worker query", asyn
     Object.defineProperty(window, "Worker", { configurable: true, value: DelayedQueryWorker });
   });
 
-  await page.goto("/");
+  await page.goto("/projections/");
   await ready(page);
   const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
   await search.fill("Málaga");
@@ -540,7 +540,7 @@ test("a superseded search response cannot replace the newest Worker query", asyn
 });
 
 test("keyboard-only search, radios, dialog focus, and reduced motion remain operable", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/projections/");
   await ready(page);
   const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
   await search.focus();

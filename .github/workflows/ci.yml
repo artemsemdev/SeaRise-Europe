@@ -131,8 +131,6 @@ jobs:
         run: npm audit --audit-level=critical --omit=dev
 
       - name: Validate static target
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: npm run web:check
 
       - name: Validate deterministic PMTiles render evidence
@@ -223,7 +221,7 @@ jobs:
           PYTHONPATH=../.. python -m unittest discover -s ../../tests/harness -p 'test_*.py'
 
       - name: Lint (ruff)
-        run: ruff check .
+        run: ruff check . ../../scripts/atlas
 
       - name: Compile retained Python package
         run: python -m compileall -q searise_pipeline
@@ -258,6 +256,7 @@ jobs:
             pytest tests/settlements/test_coastline_source.py \
               -q -k 'exact_verified_archives_rebuild_checked_in_bytes_twice or pinned_duckdb_double_to_bigint_cast_is_half_even'
 
+      # Includes tests/atlas: deterministic raster adapter fixtures, no private data.
       - name: Unit tests
         run: pytest tests/ -v
 
@@ -985,7 +984,7 @@ jobs:
   repository-removal-v2:
     name: Repository removal v2 authority
     needs: changes
-    if: needs.changes.outputs.repository_removal == 'true'
+    if: needs.changes.outputs.repository_removal == 'true' || needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -1020,15 +1019,13 @@ jobs:
           --document contracts/supply-chain/v2/static-target-profile.json
           --repository-root .
 
-      - name: Enforce repository-removal lifecycle state
+      - name: Enforce completed removal history and current safeguards
         env:
           GH_TOKEN: ${{ github.token }}
-          EXECUTION_BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
           APPLIED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: >-
-          python scripts/repository/validate_issue71_removal.py ci
-          --execution-base "${EXECUTION_BASE}"
-          --applied-commit "${APPLIED_COMMIT}"
+          python scripts/repository/validate_post_cutover.py
+          --head-commit "${APPLIED_COMMIT}"
           --verify-owner-comment
 
   ci-gate:

@@ -1,8 +1,20 @@
 {
   "$schema": "contracts/test-inventory.schema.json",
   "schemaVersion": "1.0.0",
-  "updatedAt": "2026-08-20",
+  "updatedAt": "2026-09-10",
   "evidence": {
+    "local-2026-09-10-atlas-raster-service": {
+      "kind": "local-measurement",
+      "observedAt": "2026-09-10T12:00:00+02:00",
+      "reference": "scripts/atlas/europe_raster_service.py and src/pipeline/tests/atlas/test_europe_raster_service.py",
+      "environment": "macOS arm64; Python 3.9; Rasterio; five deterministic temporary-raster cases passed, covering one-pass integrity, path confinement, native-grid point semantics, tile validity counts, and the closed HTTP route surface; no network, production raster, private candidate, durable cache, or publication claim"
+    },
+    "inspection-2026-09-10-atlas-real-local-browser": {
+      "kind": "repository-inspection",
+      "observedAt": "2026-09-10T00:00:00Z",
+      "reference": "src/web/playwright.real-local.config.ts and src/web/tests/real-local",
+      "environment": "Explicit provisioned-data browser suite, separate from normal Playwright and CI. The 360-second estimate is a scheduling allowance; execution requires the ignored local raster, basemap, and place inputs and makes no public-release or scientific-approval claim."
+    },
     "local-2026-08-17-generic-static-lighthouse": {
       "kind": "local-measurement",
       "observedAt": "2026-08-17T12:16:37+02:00",
@@ -354,6 +366,52 @@
   },
   "suites": [
     {
+      "id": "atlas-real-local-raster-service",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
+      "layer": "integration",
+      "owner": "data",
+      "purpose": "Keep the real-local atlas raster boundary read-only, path-confined, one-pass integrity checked, and exact about unknown, valid zero, flooded, and tile-count semantics.",
+      "sourcePaths": [
+        "scripts/atlas/europe_raster_service.py",
+        "src/pipeline/tests/atlas/test_europe_raster_service.py"
+      ],
+      "changedPaths": [
+        "scripts/atlas/**",
+        "src/pipeline/tests/atlas/**"
+      ],
+      "disposition": "keep-permanently",
+      "replacementGate": {
+        "issue": null,
+        "evidenceRequired": "Permanent real-local raster integrity, confinement, native-cell point, tile-count, and route-surface gate."
+      },
+      "commands": {
+        "focused": "python -m pytest src/pipeline/tests/atlas/test_europe_raster_service.py -q",
+        "full": "python -m pytest src/pipeline/tests -q"
+      },
+      "execution": {
+        "tier": "fast",
+        "ciWorkflow": "ci.yml",
+        "ciJob": "pipeline",
+        "requiresDocker": false,
+        "requiresCredentials": false
+      },
+      "cost": {
+        "estimatedSeconds": 1,
+        "class": "fast",
+        "evidenceRef": "local-2026-09-10-atlas-raster-service",
+        "scope": "focused-suite"
+      },
+      "flakiness": {
+        "status": "none-observed",
+        "owner": "data",
+        "issue": null,
+        "expiresAt": null,
+        "evidence": "Fixed three-cell EPSG:3035 rasters and in-process handler calls use temporary files only; no clock, network, browser, production data, or external executable is involved."
+      }
+    },
+    {
       "id": "static-target-content",
       "status": "active",
       "removalGate": null,
@@ -412,7 +470,7 @@
       "layer": "contract",
       "owner": "frontend",
       "purpose": "Validate one pinned immutable manifest, the exact nine-combination release aggregate, verified support geometry including the explicit browser-only nodata control, exact range-only native-grid COG lookup including a real later-chunk tile, an atomic four-outcome projection state contract, separate technical failures, and release-scoped URL reload state.",
-      "sourcePaths": ["contracts/release/v2/**", "src/pipeline/science/evidence/geography-classifier-parity-v1.json", "src/pipeline/tests/release/test_boundary_geoparquet.py", "src/web/src/contracts/**", "src/web/src/data/**", "src/web/src/domain/**", "src/web/src/use-release-context.ts"],
+      "sourcePaths": ["contracts/release/v2/**", "src/pipeline/science/evidence/geography-classifier-parity-v1.json", "src/pipeline/tests/release/test_boundary_geoparquet.py", "src/web/scripts/real-local-*.mjs", "src/web/src/atlas/**", "src/web/src/contracts/**", "src/web/src/data/**", "src/web/src/domain/**", "src/web/src/use-release-context.ts"],
       "changedPaths": ["src/pipeline/science/evidence/geography-classifier-parity-v1.json", "src/pipeline/tests/release/test_boundary_geoparquet.py", "src/web/**", "contracts/release/v1/**", "contracts/release/v2/**"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent static release/domain anti-corruption contract." },
@@ -446,7 +504,7 @@
       "layer": "e2e",
       "owner": "frontend",
       "purpose": "Verify the static React/Vite shell, direct routes, fixture disclosure, keyboard entry, accessibility smoke, exact document CSP and referrer policy, independently reconstructed recursive shell inventory, a warm full-offline reload with loaded search and one cached assessment, honest connection-required handling for an uncached COG, same-origin page-context later-chunk COG delivery and cold/cached lookup budgets, production-like delivery-header inspection, blocked unlisted origins, and zero legacy application API traffic without claiming public cross-origin enforcement.",
-      "sourcePaths": ["src/web/scripts/inspect-build.mjs", "src/web/scripts/static-output-isolation.mjs", "src/web/scripts/static-output-isolation.test.mjs", "src/web/src/**/*.test.tsx", "src/web/tests/*.spec.ts"],
+      "sourcePaths": ["src/web/scripts/inspect-build.mjs", "src/web/scripts/static-output-isolation.mjs", "src/web/scripts/static-output-isolation.test.mjs", "src/web/src/**/*.test.tsx", "src/web/tests/*.spec.ts", "src/web/scripts/atlas-edition.mjs", "src/web/scripts/atlas-edition.test.mjs"],
       "changedPaths": [".nvmrc", "package.json", "package-lock.json", "src/web/**", "contracts/release/v1/**", "contracts/release/v2/**"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent static-runtime shell and zero-API contract." },
@@ -463,7 +521,7 @@
       "layer": "integration",
       "owner": "platform",
       "purpose": "Prove the production output works on a pinned generic static-file server, exposes only the two intended document routes and immutable build/release assets, returns static 404 responses for unknown and legacy application endpoints, and meets the >=90 Lighthouse mobile performance, accessibility, best-practices, and SEO budgets in Chromium.",
-      "sourcePaths": [".github/workflows/static-quality.yml", "src/web/scripts/generic-static-host.mjs", "src/web/scripts/generic-static-host.test.mjs", "tools/static-quality/validate-generic-static-host.mjs", "tools/static-quality/run-lighthouse-gate.mjs", "tools/static-quality/package.json", "tools/static-quality/package-lock.json", "src/web/scripts/inline-initial-styles.mjs", "src/web/scripts/precompress-static-build.mjs", "docs/operations/generic-static-host-validation.md"],
+      "sourcePaths": [".github/workflows/static-quality.yml", "src/web/scripts/generic-static-host.mjs", "src/web/scripts/generic-static-host.test.mjs", "src/web/scripts/lighthouse-budget.mjs", "src/web/scripts/lighthouse-budget.test.mjs", "tools/static-quality/atlas-local-performance-waiver.json", "tools/static-quality/validate-generic-static-host.mjs", "tools/static-quality/run-lighthouse-gate.mjs", "tools/static-quality/package.json", "tools/static-quality/package-lock.json", "src/web/scripts/inline-initial-styles.mjs", "src/web/scripts/precompress-static-build.mjs", "docs/operations/generic-static-host-validation.md"],
       "changedPaths": [".github/workflows/static-quality.yml", "contracts/release/v1/fixtures/release/**", "contracts/release/v2/fixtures/browser-release/**", "src/web/**", "tools/static-quality/**"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent generic static-host portability, static-route, zero-dynamic-endpoint, and Chromium Lighthouse quality gate." },
@@ -624,6 +682,23 @@
       "execution": { "tier": "release", "ciWorkflow": null, "ciJob": null, "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 10, "class": "fast", "evidenceRef": "local-2026-08-16-range-cache-compatibility", "scope": "focused-suite" },
       "flakiness": { "status": "environment-sensitive", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "The behavior is deterministic for pinned Playwright engines and committed fixture bytes, but the release-tier command requires all three managed browser binaries and loopback binding. Public-origin delivery is intentionally outside this suite." }
+    },
+    {
+      "id": "coastal-atlas-real-local-browser",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
+      "layer": "e2e",
+      "owner": "frontend",
+      "purpose": "Exercise the provisioned CoCliCo atlas, source inspection, responsive experience, map zoom, and European boundaries through the explicit read-only local adapter; independent from clean-clone fixture CI and public scientific approval.",
+      "sourcePaths": ["src/web/tests/real-local/*.spec.ts", "src/web/playwright.real-local.config.ts"],
+      "changedPaths": ["src/web/src/atlas/**", "src/web/scripts/real-local-*.mjs", "scripts/atlas/**", "data/cartography/**", "src/web/tests/real-local/**", "src/web/playwright.real-local.config.ts"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Explicit provisioned local browser validation; never a replacement for scientific or public publication approval." },
+      "commands": { "focused": "npx playwright test --config src/web/playwright.real-local.config.ts", "full": "npx playwright test --config src/web/playwright.real-local.config.ts" },
+      "execution": { "tier": "release", "ciWorkflow": null, "ciJob": null, "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 360, "class": "slow", "evidenceRef": "inspection-2026-09-10-atlas-real-local-browser", "scope": "focused-suite" },
+      "flakiness": { "status": "environment-sensitive", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Requires an already running real-local service, provisioned verified rasters, local basemap/place data, and Chromium. Normal Playwright excludes these journeys while TypeScript checks their source. No clean-clone or public-delivery pass is claimed by this registration." }
     },
     {
       "id": "static-private-candidate-binding",
@@ -1720,7 +1795,7 @@
       "replacementEvidence": null,
       "layer": "contract",
       "owner": "platform",
-      "purpose": "Fail closed across the repository-removal v2 P-to-D-to-A authority lifecycle before any issue 72 deletion is approved or applied.",
+      "purpose": "Preserve exact completed removal approval/application history and current historical authority, reject restored runtime paths, and permit retained application files to evolve under current quality gates.",
       "sourcePaths": ["contracts/repository-removal/v2/*.schema.json", "scripts/repository/*.py", "tests/repository-removal/*.py", ".github/workflows/ci.yml"],
       "changedPaths": ["contracts/repository-removal/**", "contracts/supply-chain/v2/static-target-profile.json", "scripts/repository/**", "tests/repository-removal/**", ".github/workflows/ci.yml"],
       "disposition": "keep-permanently",
@@ -1732,6 +1807,10 @@
     }
   ],
   "baselineTests": [
+    {"path": "src/web/scripts/atlas-edition.test.mjs", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null},
+    {"path": "src/web/tests/atlas-fixture.spec.ts", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null},
+    {"path": "src/pipeline/tests/atlas/test_europe_raster_service.py", "suite": "atlas-real-local-raster-service", "status": "active", "removalGate": null, "replacementEvidence": null},
+    {"path": "src/web/scripts/real-local-atlas.test.mjs", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null},
     { "path": "scripts/compose-smoke.sh", "suite": "compose-smoke", "status": "retired", "removalGate": 72, "replacementEvidence": "Repository-removal v2 issue #72 plan and signed checks: static-generic-host-lighthouse, static-offline-lifecycle-journey, static-target-content, static-web-shell." },
     { "path": "src/api/SeaRise.Api.Tests/Application/AssessmentServiceTests.cs", "suite": "api-application-unit", "status": "retired", "removalGate": 71, "replacementEvidence": "Issue #71 retirement preserves equivalent-or-stronger static target coverage for all four outcomes, nine scenario/horizon combinations, exact AR6 lookup, technical-failure separation, release isolation, offline behavior, and zero runtime API requests. Historical five-state fixtures remain explicitly classified evidence." },
     { "path": "src/api/SeaRise.Api.Tests/Domain/ResultStateDeterminatorTests.cs", "suite": "api-domain-legacy", "status": "retired", "removalGate": 71, "replacementEvidence": "Issue #71 retirement preserves equivalent-or-stronger static target coverage for all four outcomes, nine scenario/horizon combinations, exact AR6 lookup, technical-failure separation, release isolation, offline behavior, and zero runtime API requests. Historical five-state fixtures remain explicitly classified evidence." },
@@ -1775,6 +1854,7 @@
     { "path": "src/web/scripts/build-identity.test.mjs", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/check-target-content.test.mjs", "suite": "static-target-content", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/generic-static-host.test.mjs", "suite": "static-generic-host-lighthouse", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/scripts/lighthouse-budget.test.mjs", "suite": "static-generic-host-lighthouse", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/offline-lifecycle-fixtures.test.mjs", "suite": "static-production-lifecycle-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/offline-lifecycle-server.test.mjs", "suite": "static-production-lifecycle-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/static-build-root.test.mjs", "suite": "static-production-lifecycle-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
@@ -1784,6 +1864,19 @@
     { "path": "src/web/src/application/runtime-capability.test.ts", "suite": "static-assessment-controller", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/application/use-assessment-runtime.test.tsx", "suite": "static-assessment-controller", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/application/use-projection-url.test.tsx", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/atlas/AtlasApp.test.tsx", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/atlas/CitySearch.test.tsx", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/atlas/PointInspection.test.tsx", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/atlas/model.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/atlas/browser-data-contract.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/atlas/data-source.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/atlas/synthetic-fixture.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/atlas/EuropeMap.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/atlas/basemap-style.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/tests/real-local/local-inundation-atlas.spec.ts", "suite": "coastal-atlas-real-local-browser", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/tests/real-local/local-inundation-experience.spec.ts", "suite": "coastal-atlas-real-local-browser", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/tests/real-local/local-inundation-source.spec.ts", "suite": "coastal-atlas-real-local-browser", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/tests/real-local/local-inundation-zoom.spec.ts", "suite": "coastal-atlas-real-local-browser", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/MethodologyDialog.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/FlightCapabilityStatus.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/ProjectionPanel.test.tsx", "suite": "static-projection-panel", "status": "active", "removalGate": null, "replacementEvidence": null },
@@ -1963,6 +2056,7 @@
     { "path": "tests/harness/test_inventory_evidence_time.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "tests/harness/test_changed_components.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "tests/harness/test_immutable_dependencies.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "tests/repository-removal/test_post_cutover.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "tests/repository-removal/test_candidate_isolation.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "tests/repository-removal/test_validate_removal_approval.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "tests/repository-removal/test_validate_removal_plan_v2.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null }

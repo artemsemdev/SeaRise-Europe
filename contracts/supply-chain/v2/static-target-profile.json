@@ -111,7 +111,7 @@
         {
           "path": "contracts/supply-chain/v2/sboms/static-web-npm.cdx.json",
           "role": "sbom",
-          "sha256": "6a6dcc4d80ca158a1b6c9e5002354755382b67b7768ff92520c45c2812d52aaf"
+          "sha256": "6b66ac47ae5ff2a90e6061c75a86876e0fcfd6a3b503d67146b573bc33f2b8d0"
         }
       ]
     },
@@ -124,7 +124,7 @@
         {
           "path": ".github/workflows/ci.yml",
           "role": "workflow",
-          "sha256": "4b301cac22a0fb2365f13d84d23210b7428be9154bd604a9820c1e19c6e6bd7c"
+          "sha256": "5e8616ba4ea08158785ec6ebd55ebb3273a7d387ed6b079b041def7ea2c0eb55"
         },
         {
           "path": ".github/workflows/codeql.yml",
@@ -149,7 +149,7 @@
         {
           "path": ".github/workflows/static-quality.yml",
           "role": "workflow",
-          "sha256": "7bc23ad1d142f14f3ee1224aec2d585f439928c647ac7613464a6570d760de66"
+          "sha256": "532ee44e7953a1ff218fc5f034ee124e6d242a6feb547a8b79e9bcc01481e785"
         }
       ]
     },
@@ -424,17 +424,17 @@
         {
           "path": "package-lock.json",
           "role": "lock",
-          "sha256": "ad0642e4e6c9112f1b2044e2deeb5ddf959f570ea8f59bf09cfe0a9bdd8b444a"
+          "sha256": "019a034af8b22c29b3f97e4b8bc77add293bcd353a09d539216a7a90587b2e06"
         },
         {
           "path": "package.json",
           "role": "manifest",
-          "sha256": "f4cba9e4f6c411982be028223a0d32ac8adf088d3458f65b7f6cd72530aac80d"
+          "sha256": "659dd996fc778597d83c9d237cd589ca2b8fc7d811d57b93e69eef5b2b4ef366"
         },
         {
           "path": "src/web/package.json",
           "role": "manifest",
-          "sha256": "26ff3cd02009837e05413413baebdf8f6fe610262117c5a912aacd9f6808b869"
+          "sha256": "af2bc764298a4b300a9fc0ad0e6546f5273f0799bdcf0c7e30c6e48340a4937f"
         }
       ]
     },

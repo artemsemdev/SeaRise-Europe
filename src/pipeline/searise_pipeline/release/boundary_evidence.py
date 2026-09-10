@@ -170,7 +170,12 @@ def _run_browser_harness(
             text=True,
         )
         report = json.loads(output.read_text(encoding="utf-8"))
-    except (OSError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
+    except subprocess.CalledProcessError as exc:
+        diagnostic = (exc.stderr or exc.stdout or "no child output").strip()
+        raise ScienceContractError(
+            f"Boundary browser harness failed (exit {exc.returncode}): {diagnostic}"
+        ) from exc
+    except (OSError, json.JSONDecodeError) as exc:
         raise ScienceContractError(f"Boundary browser harness failed: {exc}") from exc
     expected_inputs = {
         path.relative_to(candidate).as_posix(): {
