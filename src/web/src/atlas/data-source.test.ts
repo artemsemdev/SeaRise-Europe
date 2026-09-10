@@ -139,9 +139,11 @@ describe("real-local HTTP atlas data source", () => {
       source: { ...SYNTHETIC_ATLAS_CATALOG.source, name: "Example verified real-local source" },
     });
     const requests: string[] = [];
-    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+    const requestOptions: Array<RequestInit | undefined> = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       requests.push(url);
+      requestOptions.push(init);
       if (url.endsWith("/manifest.json")) return json(realCatalog);
       if (url.includes("/europe/search?")) return json(searchSyntheticAtlasPlaces("Venice"));
       if (url.includes("/europe/place?")) return json(VENICE);
@@ -169,6 +171,9 @@ describe("real-local HTTP atlas data source", () => {
       "/atlas-data/inspect?lon=12.3155&lat=45.4408&defenses=protected",
       `/atlas-data/tiles/2100/protected/${coordinate.z}/${coordinate.x}/${coordinate.y}.png`,
     ]);
+    for (const init of requestOptions) {
+      expect(init).toMatchObject({ method: "GET", cache: "no-store" });
+    }
   });
 
   it("returns null only for a missing place", async () => {
