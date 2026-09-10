@@ -61,12 +61,12 @@ function fixture(overrides = {}) {
 }
 
 describe("repository-removal validator capability", () => {
-  it("uses the current adapter with mandatory owner verification and exact checked revision", () => {
+  it("uses explicit offline evidence verification at the exact checked revision", () => {
     expect(postCutoverValidationArguments("/repository", "a".repeat(40))).toEqual([
       "/repository/scripts/repository/validate_post_cutover.py",
       "--repository-root", "/repository",
       "--head-commit", "a".repeat(40),
-      "--verify-owner-comment",
+      "--evidence-only",
     ]);
   });
 

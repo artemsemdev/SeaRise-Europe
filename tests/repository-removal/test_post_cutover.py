@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -177,9 +180,101 @@ class PostCutoverTests(unittest.TestCase):
                 (path / "new-runtime.txt").unlink()
                 path.rmdir()
 
-    def test_requires_receipt_ancestry(self) -> None:
-        with self.assertRaises(subprocess.CalledProcessError):
+    def test_requires_available_receipt_history_and_ancestry(self) -> None:
+        with self.assertRaisesRegex(ValueError, "receipt history is missing"):
             policy.validate_current_state(self.root, "HEAD", anchor="0" * 40)
+        self.parent = None
+        self.write("unrelated.txt", "different history")
+        self.commit()
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.validate()
+
+    def test_recomputes_blob_digest_even_when_object_read_matches_working_bytes(
+        self,
+    ) -> None:
+        corrupted = b"corrupted object bytes"
+        self.write(self.authority, corrupted.decode())
+        original_git = policy.git
+
+        def read(root, *arguments):
+            if arguments == ("show", f"{self.anchor}:{self.authority}"):
+                return corrupted
+            return original_git(root, *arguments)
+
+        with (
+            patch.object(policy, "git", side_effect=read),
+            self.assertRaisesRegex(ValueError, "Working historical authority changed"),
+        ):
+            self.validate()
+
+    def test_evidence_only_does_not_invoke_historical_validator(self) -> None:
+        with (
+            patch.object(policy, "validate_current_state") as current,
+            patch.object(policy.subprocess, "run") as run,
+        ):
+            policy.validate_post_cutover(
+                self.root, "current-head", verify_owner_comment=False
+            )
+        current.assert_called_once_with(self.root, "current-head")
+        run.assert_not_called()
+
+    def test_cli_requires_exactly_one_explicit_verification_mode(self) -> None:
+        for arguments in ([], ["--evidence-only", "--verify-owner-comment"]):
+            with self.subTest(arguments=arguments):
+                result = subprocess.run(
+                    [sys.executable, policy.__file__, *arguments],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("--evidence-only", result.stderr)
+
+    def test_real_evidence_cli_works_without_gh_credentials_or_site_packages(
+        self,
+    ) -> None:
+        executable_directory = self.root / "git-only-bin"
+        executable_directory.mkdir()
+        (executable_directory / "git").symlink_to(shutil.which("git"))
+        environment = {
+            key: value
+            for key, value in os.environ.items()
+            if key
+            not in {
+                "GH_TOKEN",
+                "GITHUB_TOKEN",
+                "GH_ENTERPRISE_TOKEN",
+                "GITHUB_ENTERPRISE_TOKEN",
+            }
+        }
+        environment["PATH"] = str(executable_directory)
+        environment["GH_CONFIG_DIR"] = str(self.root / "no-gh-config")
+        self.assertIsNone(shutil.which("gh", path=environment["PATH"]))
+        result = subprocess.run(
+            [sys.executable, "-S", policy.__file__, "--evidence-only"],
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("offline; no live owner attestation performed", result.stdout)
+        missing_history = subprocess.run(
+            [
+                sys.executable,
+                "-S",
+                policy.__file__,
+                "--evidence-only",
+                "--repository-root",
+                str(self.root),
+            ],
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(missing_history.returncode, 1)
+        self.assertIn("receipt history is missing", missing_history.stderr)
 
     def test_historical_validation_is_mandatory_and_pinned_to_completed_receipt(
         self,
@@ -188,7 +283,9 @@ class PostCutoverTests(unittest.TestCase):
             patch.object(policy, "validate_current_state") as current,
             patch.object(policy.subprocess, "run") as run,
         ):
-            policy.validate_post_cutover(self.root, "current-head")
+            policy.validate_post_cutover(
+                self.root, "current-head", verify_owner_comment=True
+            )
         current.assert_called_once_with(self.root, "current-head")
         arguments = run.call_args.args[0]
         self.assertEqual(
@@ -208,7 +305,9 @@ class PostCutoverTests(unittest.TestCase):
             patch.object(policy.subprocess, "run") as run,
         ):
             with self.assertRaises(ValueError):
-                policy.validate_post_cutover(self.root, "current-head")
+                policy.validate_post_cutover(
+                    self.root, "current-head", verify_owner_comment=True
+                )
             run.assert_not_called()
 
         with (
@@ -220,7 +319,9 @@ class PostCutoverTests(unittest.TestCase):
             ),
             self.assertRaises(subprocess.CalledProcessError),
         ):
-            policy.validate_post_cutover(self.root, "current-head")
+            policy.validate_post_cutover(
+                self.root, "current-head", verify_owner_comment=True
+            )
 
 
 if __name__ == "__main__":

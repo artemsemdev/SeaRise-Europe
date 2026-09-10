@@ -31,9 +31,9 @@ Use `scripts/repository/validate_post_cutover.py` for current development and CI
 1. Pin the completed issue-71 receipt commit
    `fd38eddccb5dce6405df48a8f25c045e740efdca` and require it to be an ancestor
    of the current checked revision.
-2. Run the original issue-71 validator against that completed receipt. Keep
-   exact historical plans, signatures, owner-comment verification, application
-   hashes, and the full inherited approval chain mandatory.
+2. In CI, run the original issue-71 validator against that completed receipt.
+   Keep exact historical plans, owner decisions, owner-comment verification,
+   application hashes, and the full inherited approval chain mandatory.
 3. Require historical authority files from all three completed removal stages
    to retain their exact Git identities and current working bytes and modes.
    Reject symlinked authority files or parent directories.
@@ -49,11 +49,20 @@ current dependency/content scanners, supply-chain input hashes, test inventory,
 private-data isolation, and build-output checks continue to run. This changes
 the temporal scope of completed removal validation, not its historical result.
 
-This first amendment retains the inherited live GitHub owner-comment check.
-Both developer content validation and CI require network access and usable
-GitHub authentication; the adapter has no offline full-validation mode.
-Issue #496 tracks separating deterministic local history checks from live CI
-approval revalidation in a subsequent explicit validation change.
+Issue #496 separates two explicitly selected validation modes. Routine source
+validation uses `--evidence-only`: standard-library Python and local Git check
+the pinned completed evidence, recomputed authority blob digests, current
+authority files, ancestry, and removed-path absence. Missing historical objects
+fail without fetching. This trusts the reviewed receipt commit as its starting
+point; it does not replay historical approval validation or attest that a
+GitHub comment still exists or remains unchanged today.
+
+The CI authority job runs for both repository-authority and web changes and
+selects `--verify-owner-comment`. It performs the same integrity checks and
+then runs the unchanged historical validator with live GitHub verification.
+Omitting a mode or selecting both fails. Output distinguishes offline evidence
+integrity from live owner attestation. No synthetic GitHub responses or
+substitution for the historical validator are used.
 
 ## Unchanged boundaries
 

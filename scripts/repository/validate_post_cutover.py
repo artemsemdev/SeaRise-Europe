@@ -7,6 +7,7 @@ adapter additionally checks current committed and working-tree safeguards.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -79,6 +80,12 @@ def completed_boundary(root: Path, anchor: str) -> tuple[set[str], set[str]]:
 def validate_current_state(
     root: Path, head: str, *, anchor: str = COMPLETED_RECEIPT_COMMIT
 ) -> None:
+    try:
+        git(root, "cat-file", "-e", f"{anchor}^{{commit}}")
+    except subprocess.CalledProcessError as error:
+        raise ValueError(
+            "Pinned completed receipt history is missing; obtain complete Git history before validation."
+        ) from error
     git(root, "merge-base", "--is-ancestor", anchor, head)
     authorities, removed = completed_boundary(root, anchor)
     for path in sorted(authorities):
@@ -89,7 +96,10 @@ def validate_current_state(
             raise ValueError(f"Committed historical authority changed: {path}")
         current = regular_path(root, path)
         expected = git(root, "show", f"{anchor}:{path}")
-        if current.read_bytes() != expected:
+        content = current.read_bytes()
+        object_id = expected_entry.split(b" ", 2)[2].split(b"\t", 1)[0].decode("ascii")
+        digest = hashlib.sha1(f"blob {len(content)}\0".encode() + content).hexdigest()
+        if content != expected or digest != object_id:
             raise ValueError(f"Working historical authority changed: {path}")
         executable = bool(current.stat().st_mode & 0o111)
         if executable != expected_entry.startswith(b"100755 "):
@@ -99,8 +109,10 @@ def validate_current_state(
             raise ValueError(f"Removed runtime path was restored: {path}")
 
 
-def validate_post_cutover(root: Path, head: str) -> None:
+def validate_post_cutover(root: Path, head: str, *, verify_owner_comment: bool) -> None:
     validate_current_state(root, head)
+    if not verify_owner_comment:
+        return
     # The original validator still independently checks exact P/D/A/R history,
     # original owner-comment authority, schemas, hashes and planned post-state.
     # Retained application files after R are governed by current quality gates.
@@ -128,14 +140,35 @@ def main() -> int:
         "--repository-root", type=Path, default=Path(__file__).resolve().parents[2]
     )
     parser.add_argument("--head-commit", default="HEAD")
-    parser.add_argument("--verify-owner-comment", action="store_true", required=True)
+    modes = parser.add_mutually_exclusive_group(required=True)
+    modes.add_argument(
+        "--evidence-only",
+        action="store_true",
+        help="Check pinned evidence and current safeguards without live owner attestation.",
+    )
+    modes.add_argument(
+        "--verify-owner-comment",
+        action="store_true",
+        help="Also run the original historical validator and live GitHub owner verification.",
+    )
     args = parser.parse_args()
     try:
-        validate_post_cutover(args.repository_root.resolve(), args.head_commit)
+        validate_post_cutover(
+            args.repository_root.resolve(),
+            args.head_commit,
+            verify_owner_comment=args.verify_owner_comment,
+        )
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         print(f"Post-cutover validation failed: {error}", file=sys.stderr)
         return 1
-    print("Validated completed removal history and current post-cutover safeguards.")
+    if args.verify_owner_comment:
+        print(
+            "Validated completed removal history, current safeguards, and live GitHub owner attestation."
+        )
+    else:
+        print(
+            "Verified pinned completed evidence integrity and current safeguards offline; no live owner attestation performed."
+        )
     return 0
 
 

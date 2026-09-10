@@ -58,17 +58,22 @@ production build.
 Historical terminology is never exempted by directory. Readiness may read
 `contracts/repository-removal/v1/historical-allowlist.preapproval.json`, but
 final mode refuses preapproval authority. Final mode requires the committed
-`historical-allowlist.json` and successful validation of the complete
-inventory, evidence-receipt, owner-decision, comment-identity, audited-object,
-and hash chain. Preapproval binds each exact repository path to its current Git
-blob only and deliberately carries no commit/tree audit claim. Final approval
-binds that path to both the current and audited Git blob SHA plus one constrained
-rule. The scanner rejects schema-shape, ID, commit/tree, duplicate,
+`historical-allowlist.json` and integrity verification against the pinned
+completed removal evidence. CI separately revalidates the complete approval
+chain, including live owner comments. Preapproval binds each exact repository
+path to its current Git blob only and deliberately carries no commit/tree
+audit claim. Final approval binds that path to both the current and audited Git
+blob SHA plus one constrained rule. The scanner rejects schema-shape, ID,
+commit/tree, duplicate,
 active-authority, and rule/path drift.
 
-The completed removal chain includes live GitHub owner-comment verification;
-the current source gate therefore requires network access and GitHub
-authentication. There is no offline full-validation mode.
+The current source gate invokes `validate_post_cutover.py --evidence-only` with
+standard-library Python and local Git. It recomputes authority blob digests,
+requires unchanged historical authority and absent retired-runtime paths, and
+fails on missing historical objects without fetching. It proves integrity
+relative to the reviewed completed receipt; it performs no live attestation.
+CI explicitly uses `--verify-owner-comment` for repository-authority or web
+changes, retaining the unchanged historical validator and live GitHub check.
 
 The preapproval document is evidence classification only. It does not approve
 deletion, publication, or an inventory disposition. The final repository-
@@ -119,9 +124,10 @@ policy tokens they reject. They remain the only executable policy-definition
 exceptions. Under [ADR-027](../architecture/adr/ADR-027-post-cutover-application-evolution.md),
 their approved historical versions remain bound to the completed removal
 receipt, while their current versions may evolve through reviewed changes and
-mutation tests. The shared post-cutover adapter verifies the original approval
-chain, unchanged current historical authority, and continued absence of the
-removed runtime. It does not waive any current content or dependency rule.
+mutation tests. The shared post-cutover adapter verifies unchanged current
+historical authority and continued absence of the removed runtime; its live CI
+mode also revalidates the original approval chain. Neither mode waives any
+current content or dependency rule.
 
 Static-output isolation independently rejects both unversioned and `/v1/`
 forms of `/assess`, `/geocode`, and `/config`. Only exact
