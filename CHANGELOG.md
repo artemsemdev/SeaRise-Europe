@@ -25,6 +25,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added explicit synthetic-fixture and real-local coastal atlas data sources
+  behind one abort-aware browser interface. Fixture inspection and PNG tiles
+  now sample the same bounded grid, while real-local failures remain technical
+  errors and never trigger synthetic fallback.
+
 - Added post-cutover validation that lets retained application and CI files
   evolve while preserving completed removal approvals and preventing the
   retired runtime from returning. Publication restrictions remain unchanged.
