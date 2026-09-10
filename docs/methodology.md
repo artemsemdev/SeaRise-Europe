@@ -1,5 +1,7 @@
 # AR6 Regional Projection Methodology
 
+> **Scope:** AR6 projection reference, governed by ADR-024. For the main coastal atlas target, see [source meaning and scope](product/COASTAL_ATLAS_PRD.md#data-meaning). This reference does not describe CoCliCo depth cells.
+
 > **Status:** Projection lookup, source parity, and Phase 0R release gate approved
 > **Last reviewed:** 2026-08-16
 > **Decision source:** [ADR-024](architecture/adr/ADR-024-ar6-regional-projection-contract.md), within [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)

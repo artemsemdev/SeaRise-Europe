@@ -1,18 +1,21 @@
 # SeaRise Flight Mock — Scope Reconciliation Map
 
-> **Status:** Active implementation contract
+> **Status:** Retained AR6 projection implementation contract
 >
 > **Canonical reference:** [SeaRise-Flight.html](SeaRise-Flight.html)
 >
 > **Replaces:** the deleted `pages/` mock set and legacy preview images
 >
-> **Behaviour authority:** [PRD](../PRD.md)
+> **Behaviour authority:** [AR6 requirements](../PRD.md)
 >
 > **Architecture authority:** [ADR-021](../../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
 >
-> **Copy authority:** [Content guidelines](../CONTENT_GUIDELINES.md)
+> **Copy authority:** [AR6 content guidelines](../CONTENT_GUIDELINES.md)
 
 ## Authority and intended use
+
+This contract governs the retained AR6 projection application only. The
+[coastal atlas design](../COASTAL_ATLAS_DESIGN.md) governs the main product target.
 
 `SeaRise-Flight.html` is the canonical visual and interaction reference for the
 static browser experience. It defines the landing composition, local
@@ -130,7 +133,7 @@ The canonical mock is intentionally self-contained so reviewers can open it
 without a build step. Its current SHA-256 is:
 
 ```text
-2f39c5f4d9d1050df7613999bc205bd08086cd689deefed730db3515a5d0b00f
+b09fdc2a19f9c4940ff6849f38ef8487e1bc321521b3bb5754a5c41bd4f8c476
 ```
 
 If the HTML export changes, update this digest and review the reconciliation map

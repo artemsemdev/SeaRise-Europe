@@ -1,5 +1,7 @@
 # SeaRise Europe — Product Vision and Strategy
 
+> **Scope:** Retained AR6 projection reference. The [coastal atlas requirements](COASTAL_ATLAS_PRD.md) and [atlas content guidelines](COASTAL_ATLAS_CONTENT.md) govern the main product target. The following requirements apply only to the projection reference.
+
 > **Owner:** Artem Sem
 >
 > **Status:** Active

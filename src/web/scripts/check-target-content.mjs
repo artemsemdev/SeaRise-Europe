@@ -25,7 +25,8 @@ const canonicalFlightRequirementsPath = resolve(
   "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
 );
 const canonicalFlightContractMarkers = Object.freeze([
-  "ACTIVE CANONICAL VISUAL AND INTERACTION REFERENCE.",
+  "AR6 PROJECTION REFERENCE ONLY.",
+  "CANONICAL VISUAL AND INTERACTION REFERENCE FOR THE RETAINED PROJECTION APP.",
   "PRESERVE: layout, information hierarchy, map-first composition, controls,",
   "SCIENTIFIC CONTENT EXCEPTION (ADR-024):",
   "exposed and notexposed -> ProjectionAvailable",
@@ -35,7 +36,7 @@ const canonicalFlightContractMarkers = Object.freeze([
   "technical failures stay outside the scientific outcome domain.",
 ]);
 const canonicalFlightRequirementsMarkers = Object.freeze([
-  "> **Status:** Active implementation contract",
+  "> **Status:** Retained AR6 projection implementation contract",
   "## Non-negotiable preservation contract",
   "| `ProjectionAvailable` | Replace both `exposed` and `notexposed` binary cards",
   "| `DataUnavailable` | Maps from `unavailable` |",
@@ -311,20 +312,18 @@ export function activeAuthoritativeDocument(content, path) {
     "`ProjectionAvailable` replaces both explicitly rejected legacy state identifiers, which do not appear in a release governed by this ADR.");
 }
 
-function verifyCanonicalFlightContract() {
-  const content = readRegularFile(canonicalFlightMockPath, "utf8");
+export function validateFlightReferenceContract(content, requirements) {
   const doctype = content.indexOf("<!DOCTYPE html>");
   if (doctype < 0) throw new Error("Canonical Flight mock is missing its document boundary");
   const annotation = content.slice(0, doctype);
-  if (annotation.includes("HISTORICAL EVIDENCE ONLY")) {
-    throw new Error("Canonical Flight mock is incorrectly labelled as historical-only evidence");
+  if (annotation.includes("ACTIVE CANONICAL VISUAL AND INTERACTION REFERENCE.")) {
+    throw new Error("Flight must be scoped to the retained AR6 projection reference");
   }
   for (const marker of canonicalFlightContractMarkers) {
     if (!annotation.includes(marker)) {
       throw new Error(`Canonical Flight mock is missing its authority marker: ${marker}`);
     }
   }
-  const requirements = readRegularFile(canonicalFlightRequirementsPath, "utf8");
   for (const marker of canonicalFlightRequirementsMarkers) {
     if (!requirements.includes(marker)) {
       throw new Error(`Canonical Flight requirements are missing their authority marker: ${marker}`);
@@ -352,8 +351,29 @@ function scanClaims(content, claims) {
   return Object.freeze(violations);
 }
 
-export function scanContent(content) {
-  return scanClaims(content, prohibitedTargetClaims);
+// Only the atlas may describe source-backed modeled exposure and inundation.
+// Other legacy outcomes and all certainty/property claims remain prohibited.
+const atlasSourceDocuments = new Set([
+  "docs/product/COASTAL_ATLAS_PRD.md",
+  "docs/product/COASTAL_ATLAS_CONTENT.md",
+  "docs/product/COASTAL_ATLAS_DESIGN.md",
+  "docs/architecture/adr/ADR-028-coastal-atlas-adoption.md",
+]);
+const atlasDomainClaims = new Set(["affirmative-modeled-exposure", "inundation-product"]);
+
+export function sourceProductScope(repositoryPath) {
+  const canonical = !repositoryPath.includes("\\") && !repositoryPath.startsWith("/")
+    && repositoryPath.split("/").every((part) => part && part !== "." && part !== "..");
+  return canonical && (repositoryPath.startsWith("src/web/src/atlas/")
+    || atlasSourceDocuments.has(repositoryPath)) ? "atlas" : "projection";
+}
+
+export function scanContent(content, product = "projection") {
+  if (product !== "projection" && product !== "atlas") throw new Error("Unknown product scope");
+  const claims = product === "atlas"
+    ? prohibitedTargetClaims.filter((claim) => !atlasDomainClaims.has(claim.id))
+    : prohibitedTargetClaims;
+  return scanClaims(content, claims);
 }
 
 export function scanProductCopy(content) {
@@ -405,7 +425,10 @@ function verifyMutationSensitivity() {
 
 function main() {
   verifyMutationSensitivity();
-  verifyCanonicalFlightContract();
+  validateFlightReferenceContract(
+    readRegularFile(canonicalFlightMockPath, "utf8"),
+    readRegularFile(canonicalFlightRequirementsPath, "utf8"),
+  );
   const builtIndex = process.argv.indexOf("--built");
   const builtRoot = builtIndex < 0 ? null : process.argv[builtIndex + 1];
   if (builtIndex >= 0 && !builtRoot) throw new Error("--built requires a directory");
@@ -419,7 +442,8 @@ function main() {
   for (const path of files) {
     const repositoryPath = relative(repositoryRoot, path).replaceAll("\\", "/");
     const content = activeAuthoritativeDocument(readScanFile(path, scanRoot), path);
-    const contentViolations = [...scanContent(content)];
+    const product = builtRoot ? "projection" : sourceProductScope(repositoryPath);
+    const contentViolations = [...scanContent(content, product)];
     const isProductCopy = builtRoot
       || path === resolve(webRoot, "index.html")
       || path.startsWith(`${resolve(webRoot, "src")}${sep}`)
