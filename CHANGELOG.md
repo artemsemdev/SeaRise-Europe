@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Aligned contributor verification guidance with the atlas fixture and explicit
+  provisioned local workflow, keeping AR6 reference checks separately scoped.
+
 - Kept return-to-place controls available on mobile and tablet map views.
 - Restored boundary browser checks after the MapLibre update, including visible
   pixel validation and useful browser failure diagnostics. Refreshed the

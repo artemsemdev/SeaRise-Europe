@@ -8,6 +8,15 @@ The machine-readable source of truth is
 enforcement live in `tests/contracts/test-inventory.schema.json` and
 `scripts/tests/validate_test_inventory.py`.
 
+## Current atlas verification
+
+The [atlas workflow](../operations/coastal-atlas-development.md) uses injected
+providers and a committed illustrative fixture in normal web checks and
+`src/web/tests/atlas-fixture.spec.ts`. Retained AR6 journeys use `/projections/`.
+The four `src/web/tests/real-local/` suites are typechecked but run only through
+`npm run local:e2e` against an explicitly started, provisioned loopback service.
+They do not replace fixture CI, release fitness gates, or scientific evidence.
+
 ## Required loop
 
 Every refactor or behavior slice follows this order:
