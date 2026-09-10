@@ -44,6 +44,29 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertTrue(classify_paths([path])["web"])
 
+    def test_atlas_raster_adapter_routes_both_consumers(self) -> None:
+        outputs = classify_paths(["scripts/atlas/europe_raster_service.py"])
+        self.assertTrue(outputs["web"])
+        self.assertTrue(outputs["pipeline"])
+        self.assertFalse(outputs["release"])
+        self.assertFalse(outputs["repository_removal"])
+
+    def test_pipeline_lints_adapter_and_runs_its_deterministic_tests(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        pipeline = workflow.split("  pipeline:\n", maxsplit=1)[1].split(
+            "\n  ar6-release-evidence:", maxsplit=1
+        )[0]
+        self.assertIn("working-directory: src/pipeline", pipeline)
+        self.assertIn("run: ruff check . ../../scripts/atlas", pipeline)
+        self.assertIn("run: pytest tests/ -v", pipeline)
+        self.assertTrue(
+            classify_paths(["src/pipeline/tests/atlas/test_europe_raster_service.py"])[
+                "pipeline"
+            ]
+        )
+        self.assertNotIn("npm run local:e2e", workflow)
+
     def test_static_quality_routes_every_direct_release_fixture_input(self) -> None:
         root = Path(__file__).resolve().parents[2]
         workflow = (root / ".github/workflows/static-quality.yml").read_text(

@@ -221,7 +221,7 @@ jobs:
           PYTHONPATH=../.. python -m unittest discover -s ../../tests/harness -p 'test_*.py'
 
       - name: Lint (ruff)
-        run: ruff check .
+        run: ruff check . ../../scripts/atlas
 
       - name: Compile retained Python package
         run: python -m compileall -q searise_pipeline
@@ -256,6 +256,7 @@ jobs:
             pytest tests/settlements/test_coastline_source.py \
               -q -k 'exact_verified_archives_rebuild_checked_in_bytes_twice or pinned_duckdb_double_to_bigint_cast_is_half_even'
 
+      # Includes tests/atlas: deterministic raster adapter fixtures, no private data.
       - name: Unit tests
         run: pytest tests/ -v
 
