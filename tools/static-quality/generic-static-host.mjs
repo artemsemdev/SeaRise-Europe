@@ -2,9 +2,10 @@ import { spawn } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { setTimeout } from "node:timers";
 import { fileURLToPath } from "node:url";
+import { stripVTControlCharacters } from "node:util";
 
 const DEFAULT_HOST = "127.0.0.1";
-const DEFAULT_PORT = 4174;
+const DEFAULT_PORT = 0;
 
 export async function startGenericStaticHost({ dist, host = DEFAULT_HOST, port = DEFAULT_PORT }) {
   const sirvBin = resolve(dirname(fileURLToPath(import.meta.resolve("sirv-cli/package.json"))), "bin.js");
@@ -13,16 +14,28 @@ export async function startGenericStaticHost({ dist, host = DEFAULT_HOST, port =
   delete environment.PORT;
   const child = spawn(
     process.execPath,
-    [sirvBin, dist, "--host", host, "--port", String(port), "--quiet", "--etag", "--brotli", "--gzip"],
+    [sirvBin, dist, "--host", host, "--port", String(port), "--etag", "--brotli", "--gzip"],
     { env: environment, stdio: ["ignore", "pipe", "pipe"] },
   );
   let diagnostics = "";
   child.stdout.on("data", (chunk) => { diagnostics += chunk; });
   child.stderr.on("data", (chunk) => { diagnostics += chunk; });
-  const origin = `http://${host}:${port}`;
+  let origin;
   for (let attempt = 0; attempt < 100; attempt += 1) {
     if (child.exitCode !== null) throw new Error(`generic static server exited early (${child.exitCode}): ${diagnostics}`);
+    // sirv may choose a different free port. Its own readiness output is the
+    // authority; probing the requested port can validate an unrelated server.
+    const announced = stripVTControlCharacters(diagnostics).match(/- Local:\s+(http:\/\/[^\s]+)/u)?.[1];
+    if (announced) {
+      const bound = new URL(announced);
+      if (bound.hostname !== host) {
+        await stopGenericStaticHost(child);
+        throw new Error(`generic static server announced an unexpected host: ${announced}`);
+      }
+      origin = bound.origin;
+    }
     try {
+      if (!origin) throw new Error("Waiting for the owned static listener");
       const response = await globalThis.fetch(origin);
       if (response.ok) return { child, origin };
     } catch {
