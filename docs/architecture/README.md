@@ -1,38 +1,54 @@
 # Architecture Documentation
 
-> **Atlas adoption:** [ADR-028](adr/ADR-028-coastal-atlas-adoption.md) defines the accepted main product target. The runtime described below remains the implemented projection reference until the atlas entry-point slice lands.
+The main application is the coastal atlas defined by
+[ADR-028](adr/ADR-028-coastal-atlas-adoption.md). The normal route `/` uses a
+small illustrative fixture; the provisioned local edition uses the same UI
+with verified CoCliCo rasters and the prepared European basemap. The retained
+AR6 projection application is at `/projections/`.
 
-> **Status:** Current for the accepted target architecture
-> **Last reviewed:** 2026-08-16
-> **Authoritative decisions:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md), [ADR-024 — AR6 Regional Projection Product Contract](adr/ADR-024-ar6-regional-projection-contract.md), and [ADR-026 — Authoritative Browser Range Persistence](adr/ADR-026-authoritative-browser-range-persistence.md)
+## Coastal atlas runtime
 
-## Architecture in one paragraph
-
-SeaRise Europe is a static geospatial data product. A reproducible
-offline pipeline acquires pinned IPCC, GeoNames, and Natural Earth
-snapshots; validates and packages immutable COG, PMTiles, GeoParquet, JSON, and
-STAC artifacts; and publishes them with checksums and signed provenance. A
-static React browser application searches settlements, validates scope, and
-returns one of four projection result states locally. Production has no
-application API, runtime database, tile server, or geocoding service.
+`AtlasApp` receives one `AtlasDataSource`. Its catalog, place search, point
+inspection, and tile methods use strict browser contracts without filesystem
+paths. The fixture provider is deterministic and browser-local. The real-local
+HTTP provider talks only to the explicitly started loopback adapter, which
+verifies local inputs and owns the Python raster process. A service failure
+remains a technical error; it never selects a different data edition.
 
 ```mermaid
 flowchart LR
-    Source[Versioned sources]
-    Build[Offline build plane]
-    Release[Signed immutable release]
-    Edge[Static host + object CDN]
-    Browser[Browser search + assessment + map]
-
-    Source --> Build --> Release --> Edge --> Browser
+    UI[Atlas interface] --> Source[AtlasDataSource]
+    Source --> Fixture[Small authored fixture]
+    Source --> HTTP[Real-local HTTP adapter]
+    HTTP --> Context[Verified European place index and basemap]
+    HTTP --> Raster[Python raster service]
+    Raster --> Files[Verified local CoCliCo rasters]
 ```
 
-The checked-in application implements this static architecture. The superseded
-service-based runtime has been removed from the repository under ADR-025. The
-[delivery plan](../delivery/README.md) records completed repository migration
-evidence and the remaining scientific release and deployment gates.
+The edition is selected at build/development startup. Preview verifies that its
+mode matches the built document. Real-local listeners are restricted to
+loopback. Large source files stay outside the application build and Git.
+The atlas does not register a service worker; the retained projection worker
+precaches its own document and resources and passes atlas requests through.
 
-## Start here
+MapLibre and its bundled worker load separately from the initial interface.
+The map displays Europe, including complete Ukraine and Crimea. Geographic
+detail and modeled depth are separate layers; closer zoom does not increase
+the source's native 25-meter cell resolution. See the
+[product contract](../product/COASTAL_ATLAS_PRD.md) and
+[development workflow](../operations/coastal-atlas-development.md) for the
+six supported combinations and reproducible local commands.
+
+## Retained projection architecture
+
+The following decisions and evidence describe the AR6 reference application.
+Its offline pipeline builds immutable COG, PMTiles, GeoParquet, JSON, and STAC
+artifacts; its static browser searches settlements and returns ADR-024's four
+projection result states. Its source identities, scientific evidence, and
+release history remain independent of the coastal atlas. The retired
+service-based application remains removed under ADR-025.
+
+### Projection reference decisions
 
 Read in this order:
 
@@ -56,7 +72,7 @@ Read in this order:
 9. [Deployment](08-deployment-topology.md) — Cloudflare/R2 reference topology
    and portable delivery requirements.
 
-## Current document set
+## Retained projection document set
 
 | Document | Purpose |
 |---|---|
@@ -81,7 +97,7 @@ Read in this order:
 | [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md) | Authoritative static-first architecture decision |
 | [ADR-026](adr/ADR-026-authoritative-browser-range-persistence.md) | Authoritative complete-resource, COG range, and PMTiles persistence boundary |
 
-Supporting current documents:
+Supporting projection reference documents:
 
 - [Provisional methodology](../methodology.md)
 - [Static-first migration plan](../delivery/README.md)
@@ -89,7 +105,7 @@ Supporting current documents:
 - [Content guidelines](../product/CONTENT_GUIDELINES.md)
 - [Canonical Flight visual and interaction contract](../product/Mock/DESIGN.md)
 
-Architecture components implement the canonical Flight experience rather than
+Retained AR6 components implement the canonical Flight experience rather than
 substituting a generic dashboard or map utility. ADR-024 overrides the mock's
 binary exposure, terrain comparison, modeled-water/flood meaning, and related
 scientific copy; it does not override Flight's layout, information hierarchy,
@@ -110,7 +126,7 @@ Documents use these terms consistently:
 No document may use “implemented,” “validated,” or “production-ready” for the
 target architecture without executable evidence.
 
-## Fixed architecture contracts
+## Fixed AR6 reference contracts
 
 - Scenarios: `ssp1-26`, `ssp2-45`, `ssp5-85`.
 - Horizons: `2030`, `2050`, `2100`.
@@ -144,7 +160,8 @@ current.
 
 ## Documentation maintenance rules
 
-- ADR-021 wins when another document conflicts with it.
+- ADR-028 governs the coastal atlas; ADR-021 and its amendments govern the
+  retained AR6 reference and their explicitly retained delivery contracts.
 - A materially different runtime, scientific method, hosting dependency, or
   privacy model requires a new ADR.
 - Update diagrams and prose in the same pull request as a contract change.

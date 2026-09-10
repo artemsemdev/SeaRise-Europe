@@ -1,9 +1,9 @@
 # SeaRise Europe — Coastal atlas requirements
 
-Status: accepted product target; engineering adoption in [#490](https://github.com/artemsemdev/SeaRise-Europe/issues/490).
-The integration branch still starts the retained projection application until
-its entry-point migration lands. This document does not claim that transfer or
-public release is complete.
+Status: active product contract; engineering adoption in [#490](https://github.com/artemsemdev/SeaRise-Europe/issues/490).
+The main route runs the coastal atlas with an explicitly selected fixture or
+real-local edition. The retained projection reference is at `/projections/`.
+Local functionality does not establish a public or scientific release.
 
 ## Purpose
 

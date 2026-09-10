@@ -8,11 +8,13 @@
 
 ## Purpose
 
-This is the only active technical delivery plan for SeaRise Europe. The former
-eight-epic Azure/backend plan was removed after ADR-021 replaced its target
-architecture.
+This roadmap records the static projection migration and its later public
+delivery work. The current coastal atlas integration is tracked in #490; see the
+[backlog scope mapping](coastal-atlas-backlog.md) for retained and deferred work. The
+former eight-epic Azure/backend plan was removed after ADR-021 replaced that
+runtime.
 
-The Phase 2 integration branch now provides:
+The completed Phase 2 projection integration provided:
 
 - a React/Vite static application backed by immutable browser-ready artifacts;
 - no checked-in request-time application, database, tile, geocoder, or Compose
@@ -25,9 +27,10 @@ The Phase 2 integration branch now provides:
   remains ignored and local only; clean clones use the committed synthetic
   release fixture.
 
-ADR-025 makes the static application the only repository runtime. Focused Phase
-2 pull requests removed the superseded runtime after replacement coverage
-passed; Git history is sufficient source recovery.
+At the ADR-025 cutover, the static application became the only repository
+runtime. Focused Phase 2 pull requests removed the superseded runtime after
+replacement coverage passed; Git history is sufficient source recovery.
+ADR-028 subsequently permits the atlas's explicit read-only loopback adapter.
 
 ## Delivery principles
 
@@ -46,9 +49,9 @@ Per `AGENTS.md`, implementation work should be split into focused pull requests,
 normally 100–400 changed lines and no more than about 800 for mechanical work.
 Use Conventional Commits and the repository pull-request template.
 
-## Current repository baseline
+## Completed Phase 2 projection baseline
 
-| Area | Implemented repository state |
+| Area | Completed projection baseline |
 |---|---|
 | Frontend | React 19 / Vite 8 static build |
 | Search | Release-bound GeoNames index in a Web Worker |
