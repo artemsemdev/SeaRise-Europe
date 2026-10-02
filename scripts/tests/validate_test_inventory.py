@@ -87,6 +87,10 @@ def _discover_test_files() -> set[str]:
     )
     files.update(
         str(path.relative_to(ROOT))
+        for path in (ROOT / "scripts/demo").rglob("*.test.mjs")
+    )
+    files.update(
+        str(path.relative_to(ROOT))
         for path in (ROOT / "src/web/tests").rglob("*.spec.ts")
     )
     files.update(

@@ -10,6 +10,11 @@
     "src/web"
   ],
   "scripts": {
+    "demo:preflight": "node scripts/demo/demo.mjs preflight",
+    "demo:prepare": "node scripts/demo/demo.mjs prepare",
+    "demo:serve": "node scripts/demo/demo.mjs serve",
+    "demo:lint": "eslint scripts/demo --config src/web/eslint.config.js",
+    "demo:test": "node --test scripts/demo/*.test.mjs",
     "web:dev": "npm run dev --workspace @searise/web",
     "web:lint": "npm run lint --workspace @searise/web",
     "web:type-check": "npm run type-check --workspace @searise/web",
@@ -19,7 +24,7 @@
     "web:serve:offline-lifecycle": "npm run serve:offline-lifecycle --workspace @searise/web",
     "web:e2e:offline-lifecycle": "npm run e2e:offline-lifecycle --workspace @searise/web",
     "web:e2e": "npm run e2e --workspace @searise/web",
-    "web:check": "npm run web:lint && npm run web:type-check && npm run web:test && npm run web:build",
+    "web:check": "npm run demo:lint && npm run demo:test && npm run web:lint && npm run web:type-check && npm run web:test && npm run web:build",
     "local:start": "npm run dev --workspace @searise/web -- --mode real-local --host 127.0.0.1 --port 4181 --strictPort",
     "local:build": "npm run build:real-local --workspace @searise/web",
     "local:serve": "npm run serve:real-local --workspace @searise/web",
