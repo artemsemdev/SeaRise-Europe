@@ -16,6 +16,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a source-linked coastal atlas architecture diagram, a standalone
+  light/dark HTML viewer, and SVG/PNG exports for the README. The overview
+  distinguishes fixture and real-local editions and the retained projection
+  reference at the demo prerelease source.
+
 - Added post-cutover validation that lets retained application and CI files
   evolve while preserving completed removal approvals and preventing the
   retired runtime from returning. Publication restrictions remain unchanged.

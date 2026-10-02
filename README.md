@@ -131,6 +131,19 @@ update warning on first installation before an ordinary reload obtains the exact
 verified controlling worker; follow-up is tracked in
 [#531](https://github.com/artemsemdev/SeaRise-Europe/issues/531).
 
+## Architecture at a glance
+
+![Coastal atlas architecture](docs/architecture/diagrams/coastal-atlas/coastal-atlas.svg)
+
+The same interface selects either the browser fixture or the explicitly
+provisioned local CoCliCo edition. The local edition reads verified rasters
+through loopback Node/Python processes; the retained projection reference has
+its own data and storage.
+
+[Explore the interactive diagram](docs/architecture/diagrams/coastal-atlas/README.md)
+for source-linked components, light/dark themes, and image exports. The diagram
+is pinned to the demo prerelease source; download its HTML to open it locally.
+
 ## Project documentation
 
 Start with the [documentation index](docs/README.md),

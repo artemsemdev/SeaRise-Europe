@@ -8,6 +8,10 @@ AR6 projection application is at `/projections/`.
 
 ## Coastal atlas runtime
 
+[Open the source-linked architecture diagram](diagrams/coastal-atlas/README.md)
+for an interactive overview and downloadable SVG/PNG. It describes the demo
+prerelease runtime at a pinned source revision.
+
 `AtlasApp` receives one `AtlasDataSource`. Its catalog, place search, point
 inspection, and tile methods use strict browser contracts without filesystem
 paths. The fixture provider is deterministic and browser-local. The real-local
