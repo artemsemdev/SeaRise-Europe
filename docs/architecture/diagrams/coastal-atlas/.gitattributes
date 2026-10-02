@@ -1,0 +1,4 @@
+# Keep canonical generator/export bytes, including upstream trailing spaces.
+coastal-atlas.html linguist-generated=true whitespace=-blank-at-eol
+coastal-atlas.svg linguist-generated=true whitespace=-blank-at-eol
+coastal-atlas.png linguist-generated=true

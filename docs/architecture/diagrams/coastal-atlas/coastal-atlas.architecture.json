@@ -1,0 +1,467 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "SeaRise Europe \u00b7 Coastal Atlas",
+    "locale": "en",
+    "output": ".archify/architecture-coastal-atlas-20261002-201059/coastal-atlas.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/artemsemdev/SeaRise-Europe.git",
+      "provider": "github",
+      "revision": "24d125c9810cfc20a370b133842296736d39f678",
+      "link_mode": "web"
+    }
+  },
+  "components": [
+    {
+      "id": "atlas-ui",
+      "type": "frontend",
+      "label": "Atlas interface",
+      "sublabel": "React + MapLibre",
+      "tag": "Search \u00b7 inspect \u00b7 compare",
+      "pos": [
+        30,
+        50
+      ],
+      "size": [
+        220,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/web/src/atlas/AtlasApp.tsx",
+          "line": 160,
+          "end_line": 179,
+          "label": "Interface and map"
+        },
+        {
+          "path": "src/web/src/atlas/PointInspection.tsx",
+          "line": 18,
+          "end_line": 28,
+          "label": "Point request"
+        },
+        {
+          "path": "src/web/src/atlas/EuropeMap.tsx",
+          "line": 250,
+          "end_line": 285,
+          "label": "Flood tile protocol"
+        }
+      ]
+    },
+    {
+      "id": "edition",
+      "type": "frontend",
+      "label": "AtlasDataSource",
+      "sublabel": "Explicit build edition",
+      "tag": "No automatic fallback",
+      "pos": [
+        350,
+        50
+      ],
+      "size": [
+        220,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/web/src/atlas/create-data-source.ts",
+          "line": 5,
+          "end_line": 16,
+          "label": "One selected edition"
+        },
+        {
+          "path": "src/web/src/atlas/data-source.ts",
+          "line": 1,
+          "label": "Browser interface"
+        },
+        {
+          "path": "src/web/scripts/atlas-edition.mjs",
+          "line": 9,
+          "end_line": 25,
+          "label": "Build / development mode"
+        }
+      ]
+    },
+    {
+      "id": "fixture",
+      "type": "frontend",
+      "label": "Illustrative fixture",
+      "sublabel": "In-browser values + PNG",
+      "tag": "Synthetic \u00b7 default",
+      "pos": [
+        350,
+        250
+      ],
+      "size": [
+        220,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/web/src/atlas/fixture-data-source.ts",
+          "line": 138,
+          "end_line": 176,
+          "label": "Local fixture provider"
+        }
+      ]
+    },
+    {
+      "id": "http-source",
+      "type": "frontend",
+      "label": "HTTP provider",
+      "sublabel": "Same-origin /atlas-data",
+      "tag": "GET \u00b7 no-store",
+      "pos": [
+        670,
+        50
+      ],
+      "size": [
+        220,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/web/src/atlas/http-data-source.ts",
+          "line": 60,
+          "end_line": 104,
+          "label": "Transport and validation"
+        },
+        {
+          "path": "src/web/src/atlas/http-data-source.ts",
+          "line": 134,
+          "end_line": 168,
+          "label": "Inspection and tiles"
+        }
+      ]
+    },
+    {
+      "id": "local-host",
+      "type": "backend",
+      "label": "Local host",
+      "sublabel": "Vite + Node middleware",
+      "tag": "127.0.0.1 only",
+      "pos": [
+        670,
+        450
+      ],
+      "size": [
+        220,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/web/scripts/real-local-atlas.mjs",
+          "line": 238,
+          "end_line": 315,
+          "label": "Private routes and proxy"
+        },
+        {
+          "path": "src/web/scripts/real-local-atlas.mjs",
+          "line": 355,
+          "end_line": 393,
+          "label": "Owned raster process"
+        },
+        {
+          "path": "scripts/demo/sealed-preview.mjs",
+          "line": 5,
+          "end_line": 24,
+          "label": "Sealed app preview"
+        }
+      ]
+    },
+    {
+      "id": "raster-service",
+      "type": "backend",
+      "label": "Raster service",
+      "sublabel": "Python + Rasterio",
+      "tag": "Native cell \u00b7 PNG tiles",
+      "pos": [
+        350,
+        450
+      ],
+      "size": [
+        220,
+        80
+      ],
+      "sources": [
+        {
+          "path": "scripts/atlas/europe_raster_service.py",
+          "line": 206,
+          "end_line": 254,
+          "label": "Native point sampling"
+        },
+        {
+          "path": "scripts/atlas/europe_raster_service.py",
+          "line": 273,
+          "end_line": 323,
+          "label": "Separate tile renderer"
+        },
+        {
+          "path": "src/web/scripts/real-local-atlas.mjs",
+          "line": 355,
+          "end_line": 393,
+          "label": "Loopback child startup"
+        }
+      ]
+    },
+    {
+      "id": "coclico",
+      "type": "external",
+      "label": "CoCliCo rasters",
+      "sublabel": "3 years \u00d7 2 defenses",
+      "tag": "Read-only \u00b7 native 25 m",
+      "pos": [
+        30,
+        450
+      ],
+      "size": [
+        220,
+        80
+      ],
+      "sources": [
+        {
+          "path": "scripts/atlas/europe_raster_service.py",
+          "line": 159,
+          "end_line": 204,
+          "label": "Verified raster inventory"
+        },
+        {
+          "path": "scripts/atlas/europe_raster_service.py",
+          "line": 206,
+          "end_line": 254,
+          "label": "Original TIFF cell read"
+        }
+      ]
+    },
+    {
+      "id": "cartography",
+      "type": "external",
+      "label": "Local map + places",
+      "sublabel": "PMTiles \u00b7 fonts \u00b7 index",
+      "tag": "External app inputs",
+      "pos": [
+        670,
+        640
+      ],
+      "size": [
+        220,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/web/scripts/real-local-atlas.mjs",
+          "line": 299,
+          "end_line": 312,
+          "label": "Confined basemap ranges"
+        },
+        {
+          "path": "src/web/scripts/real-local-context.mjs",
+          "line": 86,
+          "end_line": 112,
+          "label": "Verified place index"
+        },
+        {
+          "path": "src/web/scripts/real-local-context.mjs",
+          "line": 157,
+          "end_line": 193,
+          "label": "Local search and place routes"
+        }
+      ]
+    },
+    {
+      "id": "reference",
+      "type": "frontend",
+      "label": "Projection reference",
+      "sublabel": "Separate /projections/ entry",
+      "tag": "Synthetic AR6",
+      "pos": [
+        30,
+        820
+      ],
+      "size": [
+        260,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/web/projections/index.html",
+          "line": 18,
+          "end_line": 20,
+          "label": "Separate reference entry"
+        },
+        {
+          "path": "src/web/src/offline/register-service-worker.ts",
+          "line": 34,
+          "end_line": 46,
+          "label": "Root-scoped worker registration"
+        }
+      ]
+    },
+    {
+      "id": "reference-router",
+      "type": "frontend",
+      "label": "Verified resource router",
+      "sublabel": "Reference shell + COG ranges",
+      "tag": "Reference-only storage",
+      "pos": [
+        430,
+        820
+      ],
+      "size": [
+        280,
+        80
+      ],
+      "sources": [
+        {
+          "path": "src/web/src/offline/create-production-resource-router.ts",
+          "line": 162,
+          "end_line": 239,
+          "label": "Verified caches and ranges"
+        },
+        {
+          "path": "src/web/scripts/service-worker-precache.mjs",
+          "line": 90,
+          "end_line": 105,
+          "label": "Atlas excluded from precache"
+        },
+        {
+          "path": "src/web/src/offline/service-worker-runtime.ts",
+          "line": 390,
+          "end_line": 405,
+          "label": "Allowlisted fetch handling"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Browser \u00b7 main Atlas /",
+      "wraps": [
+        "atlas-ui",
+        "edition",
+        "fixture",
+        "http-source"
+      ],
+      "pad": 28
+    },
+    {
+      "kind": "security-group",
+      "label": "Loopback processes \u00b7 127.0.0.1",
+      "wraps": [
+        "local-host",
+        "raster-service"
+      ],
+      "pad": 28
+    },
+    {
+      "kind": "region",
+      "label": "CoCliCo inputs",
+      "wraps": [
+        "coclico"
+      ],
+      "pad": 24
+    },
+    {
+      "kind": "region",
+      "label": "Local cartography",
+      "wraps": [
+        "cartography"
+      ],
+      "pad": 24
+    },
+    {
+      "kind": "region",
+      "label": "Retained reference \u00b7 separate data and storage",
+      "wraps": [
+        "reference",
+        "reference-router"
+      ],
+      "pad": 28
+    }
+  ],
+  "connections": [
+    {
+      "id": "ui-data",
+      "from": "atlas-ui",
+      "to": "edition",
+      "label": "request",
+      "variant": "emphasis"
+    },
+    {
+      "id": "edition-fixture",
+      "from": "edition",
+      "to": "fixture",
+      "label": "fixture mode",
+      "variant": "dashed"
+    },
+    {
+      "id": "edition-http",
+      "from": "edition",
+      "to": "http-source",
+      "label": "real-local",
+      "variant": "emphasis"
+    },
+    {
+      "id": "http-host",
+      "from": "http-source",
+      "to": "local-host",
+      "label": "HTTP / GET",
+      "variant": "emphasis"
+    },
+    {
+      "id": "host-raster",
+      "from": "local-host",
+      "to": "raster-service",
+      "label": "loopback",
+      "variant": "emphasis"
+    },
+    {
+      "id": "raster-input",
+      "from": "raster-service",
+      "to": "coclico",
+      "label": "read TIFF",
+      "variant": "emphasis"
+    },
+    {
+      "id": "host-assets",
+      "from": "local-host",
+      "to": "cartography",
+      "label": "read files"
+    },
+    {
+      "id": "reference-resources",
+      "from": "reference",
+      "to": "reference-router",
+      "label": "verified reads",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "One interface \u00b7 two explicit editions",
+      "items": [
+        "Fixture values are illustrative; real-local has no fixture fallback.",
+        "2030 / 2050 / 2100 \u00b7 SSP5-8.5 \u00b7 spring high tide."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Model values stay native",
+      "items": [
+        "Point inspection reads the containing 25 m cell, not map pixels.",
+        "Visual tiles may use overviews; unknown and zero remain distinct."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Local demo boundary",
+      "items": [
+        "Private Atlas responses are no-store; datasets stay outside the app.",
+        "The root-scoped reference worker handles only its allowlist."
+      ]
+    }
+  ]
+}
