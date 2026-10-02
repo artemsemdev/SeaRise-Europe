@@ -91,7 +91,12 @@ mobile controls and explicit unknown/error handling. Preserve failed logs before
 fixing a defect; do not retry until green without diagnosis.
 
 The atlas entry does not register a service worker or implement persistent
-storage of its private derived raster data; tile responses are `no-store`. The
+storage of its private derived raster data. All `/atlas-data/` responses,
+including catalog, search, inspection, tiles, basemap ranges and errors, are
+`no-store`. The sealed static UI uses `no-cache` so the retained reference worker
+can verify and precache application bytes. Reference release artifacts retain
+the manifest delivery policy, strong SHA256 ETags and strict byte ranges;
+compressed search indexes are served as opaque bytes. The
 retained `/projections/` fixture can register a root-scoped service worker for
 its static application/fixture resources, so use a fresh browser profile when
 validating a candidate rather than inheriting an earlier edition's caches. A

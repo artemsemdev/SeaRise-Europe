@@ -22,6 +22,11 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Restored the local demo’s labeled synthetic projection reference by allowing
+  verified static application caching and preserving exact release byte ranges
+  and manifest identities. Private Atlas data, basemap and error responses stay
+  `no-store`; the reference now uses the application icon without a favicon error.
+
 - Local demo shutdown now reaps the raster process even when interrupted before
   native startup finishes, preventing orphan services during candidate checks.
 
