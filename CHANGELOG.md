@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Local demo shutdown now reaps the raster process even when interrupted before
+  native startup finishes, preventing orphan services during candidate checks.
+
 - Prevented browsers and intermediaries from retaining private, locally derived
   coastal raster tiles by marking every tile response `no-store`.
 - Made fixture city markers easier to tap and aligned the flood-layer control

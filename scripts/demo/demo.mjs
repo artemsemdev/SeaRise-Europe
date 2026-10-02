@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { atlasMainRepositoryRoot, createRealLocalAtlas } from "../../src/web/scripts/real-local-atlas.mjs";
 import { assertByteAffectingRuntime } from "../../src/web/scripts/search-shard-builder.mjs";
 import { createOutput, dataIdentities, inventory, parseOptions, seal, verifyCandidate } from "./candidate.mjs";
+import { createLifecycle } from "./lifecycle.mjs";
 
 const repositoryRoot = resolve(import.meta.dirname, "../..");
 const webRoot = resolve(repositoryRoot, "src/web");
@@ -20,6 +21,15 @@ Use the official Node distribution: matching semver alone may have incompatible 
 SEARISE_* and VITE_* overrides and active .env files are rejected; use explicit CLI arguments.
 `;
 if (args.includes("--help")) { console.log(help); process.exit(0); }
+const lifecycle = createLifecycle();
+
+async function localAtlas(options) {
+  const runtime = await createRealLocalAtlas({ repositoryRoot, atlasRoot: options["data-root"], spawn: lifecycle.spawn,
+    ...(options.python ? { python: options.python } : {}) });
+  lifecycle.addCloser(runtime.close);
+  if (lifecycle.interrupted) throw new Error("Demo startup interrupted.");
+  return runtime;
+}
 
 function git(...arguments_) {
   return execFileSync("git", arguments_, { cwd: repositoryRoot, encoding: "utf8" }).trim();
@@ -42,8 +52,7 @@ function toolchain() {
 async function preflight(options) {
   const identities = dataIdentities(options["data-root"]);
   console.log("Checking local adapter and raster integrity; startup hashes the provisioned rasters.");
-  const runtime = await createRealLocalAtlas({ repositoryRoot, atlasRoot: options["data-root"],
-    ...(options.python ? { python: options.python } : {}) });
+  const runtime = await localAtlas(options);
   await runtime.close();
   if (JSON.stringify(dataIdentities(options["data-root"])) !== JSON.stringify(identities)) throw new Error("Data identity changed during preflight.");
   return identities;
@@ -94,21 +103,27 @@ async function main() {
   }
   const identities = dataIdentities(options["data-root"]);
   const { app } = verifyCandidate(options.candidate, sourceRevision, identities);
-  const runtime = await createRealLocalAtlas({ repositoryRoot, atlasRoot: options["data-root"],
-    ...(options.python ? { python: options.python } : {}) });
-  let server;
-  let closing;
-  const close = () => (closing ??= (async () => { await server?.close(); await runtime.close(); })());
-  for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => { void close().then(() => process.exit(0)); });
+  const runtime = await localAtlas(options);
   try {
     if (cleanRevision() !== sourceRevision || JSON.stringify(dataIdentities(options["data-root"])) !== JSON.stringify(identities)) throw new Error("Source or data changed during startup.");
-    server = await preview({ configFile: false, envDir: false, root: webRoot, build: { outDir: app },
+    await preview({ configFile: false, envDir: false, root: webRoot, build: { outDir: app },
       preview: { host: "127.0.0.1", port: options.port ?? 4181, strictPort: true, headers: { "Cache-Control": "no-store", "Content-Encoding": "identity" } },
-      plugins: [{ name: "sealed-local-demo", configurePreviewServer(active) { active.middlewares.use(runtime.middleware); } }],
+      plugins: [{ name: "sealed-local-demo", configurePreviewServer(active) {
+        lifecycle.addCloser(() => active.close());
+        active.middlewares.use(runtime.middleware);
+      } }],
     });
     console.log(`Private local demo ${sourceRevision}: http://127.0.0.1:${options.port ?? 4181}`);
     console.log("publicPromotionAuthorized=false mvpRelease=false; stop with Ctrl+C");
-  } catch (error) { await close(); throw error; }
+  } catch (error) { await lifecycle.close(); throw error; }
 }
 
-main().catch((error) => { console.error(error.message.replaceAll(atlasMainRepositoryRoot(repositoryRoot), "<checkout>")); process.exitCode = 1; });
+main().then(() => { if (command !== "serve") lifecycle.dispose(); }, async (error) => {
+  const interrupted = lifecycle.interrupted;
+  await lifecycle.close();
+  lifecycle.dispose();
+  if (!interrupted) {
+    console.error(error.message.replaceAll(atlasMainRepositoryRoot(repositoryRoot), "<checkout>"));
+    process.exitCode = 1;
+  }
+});

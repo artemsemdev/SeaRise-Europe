@@ -3,6 +3,12 @@
   "schemaVersion": "1.0.0",
   "updatedAt": "2026-10-02",
   "evidence": {
+    "local-2026-10-02-demo-startup-shutdown": {
+      "kind": "local-measurement",
+      "observedAt": "2026-10-02T11:27:00Z",
+      "reference": "scripts/demo/startup-signal.test.mjs",
+      "environment": "Official Node 20.20.1/npm 11.12.1; genuine CLI SIGTERM/SIGINT startup checks use only temporary manifests, a place fixture and a PID-recording interpreter stub. Reproduce orphan before fix and verify graceful/forced child reaping after fix; no private data, Python, browser or socket required."
+    },
     "local-2026-10-02-demo-candidate": {
       "kind": "local-measurement",
       "observedAt": "2026-10-02T10:33:00Z",
@@ -385,8 +391,8 @@
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent private local demo integrity gate." },
       "commands": { "focused": "npm run demo:test", "full": "npm run web:check" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
-      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-10-02-demo-candidate", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Temporary files and deterministic options/identity checks; no provisioned datasets, interpreter, browser or loopback binding." }
+      "cost": { "estimatedSeconds": 6, "class": "fast", "evidenceRef": "local-2026-10-02-demo-startup-shutdown", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Temporary files, deterministic identity checks and genuine child-process signals with PID readiness and a bounded deadline; no provisioned datasets, scientific interpreter, browser or loopback binding." }
     },
     {
       "id": "atlas-real-local-raster-service",
@@ -1830,6 +1836,7 @@
     }
   ],
   "baselineTests": [
+    { "path": "scripts/demo/startup-signal.test.mjs", "suite": "private-local-demo-candidate", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "scripts/demo/candidate.test.mjs", "suite": "private-local-demo-candidate", "status": "active", "removalGate": null, "replacementEvidence": null },
     {"path": "src/web/scripts/atlas-edition.test.mjs", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null},
     {"path": "src/web/tests/atlas-fixture.spec.ts", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null},
