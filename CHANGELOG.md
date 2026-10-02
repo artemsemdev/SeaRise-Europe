@@ -11,6 +11,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- The coastal Atlas gives its controls a paint opportunity before cold map
+  initialization and bounds dense-display canvas allocation, reducing measured
+  local software-render startup cost while retaining the raw performance gate.
+
 - Fresh Lighthouse audits meeting every 90-point budget now pass independently
   of the historical Atlas waiver; expired exceptions still cannot accept slow runs.
 

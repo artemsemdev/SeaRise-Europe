@@ -11,6 +11,15 @@ import type { AtlasDataSource } from "./data-source";
 import "./atlas.css";
 
 export default function AtlasApp({ dataSource }: { dataSource: AtlasDataSource }) {
+  const [mapStartupReady, setMapStartupReady] = useState(false);
+  // Give the controls a paint opportunity before cold WebGL initialization.
+  // The second frame starts the real map immediately after that first paint.
+  useEffect(() => {
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => setMapStartupReady(true));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
   const [qaMapEnabled] = useState(() => new URLSearchParams(window.location.search).get("qa") === "map");
   const [selection, setSelection] = useState(() => readSelection(window.location.search));
   const { cityId, year, protection, visible, compare, camera, point } = selection;
@@ -154,10 +163,10 @@ export default function AtlasApp({ dataSource }: { dataSource: AtlasDataSource }
     </header>
     <div className="scenario-pill"><span><strong>SSP5-8.5</strong> · Spring high tide · {protection === "protected" ? "High protection" : "No additional defenses"}</span><button type="button" className="about-trigger" aria-label="About the map" onClick={() => setAbout(true)}><Info size={19} /></button></div>
     <div className="atlas-geography" aria-label="Interactive coastal flood map" data-testid="atlas-map" data-model={dataSource.edition === "synthetic-fixture" ? "illustrative-fixture" : "coclico"} data-year={year} data-layer={layer?.id ?? ""}>
-      <MapChunkBoundary onFailure={onMapFailure}><Suspense fallback={<div className="map-loading" role="status">Loading the European map…</div>}><EuropeMap qaMapEnabled={qaMapEnabled} dataSource={dataSource} key={`${retry}-${mapRevision}`} city={city} year={year} protection={protection} visible={visible && !!layer} onStatus={onStatus}
+      <MapChunkBoundary onFailure={onMapFailure}><Suspense fallback={<div className="map-loading" role="status">Loading the European map…</div>}>{mapStartupReady ? <EuropeMap qaMapEnabled={qaMapEnabled} dataSource={dataSource} key={`${retry}-${mapRevision}`} city={city} year={year} protection={protection} visible={visible && !!layer} onStatus={onStatus}
         initialCamera={initialCamera} restoreCity={restoreCity} onCameraChange={onCameraChange} inspectionPoint={inspectedPoint} onInspect={onInspect} focusRequest={focusRequest}
         onOverview={exploreEurope} onShare={() => void share()} shared={shared} onRefocus={() => setFocusRequest((value) => value + 1)}
-        onPlace={(id) => { setPointOpen(true); setPlaceError(null); setSelection((current) => ({ ...current, cityId: id, point: null })); }} /></Suspense></MapChunkBoundary>
+        onPlace={(id) => { setPointOpen(true); setPlaceError(null); setSelection((current) => ({ ...current, cityId: id, point: null })); }} /> : <div className="map-loading" role="status">Loading the European map…</div>}</Suspense></MapChunkBoundary>
       <div className="map-view-label"><span>{compare ? "COMPARING · HIGH TIDE" : "HIGH EMISSIONS · HIGH TIDE"}</span><strong>{year}</strong>{!visible && <small>Flood layer hidden</small>}</div>
     </div>
 
