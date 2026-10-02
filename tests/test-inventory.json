@@ -7,7 +7,7 @@
       "kind": "local-measurement",
       "observedAt": "2026-10-02T10:33:00Z",
       "reference": "scripts/demo/candidate.test.mjs",
-      "environment": "macOS x64 Node 20.20.1; four deterministic temporary-file tests passed in under one second; options, confinement, links, app/data/source/edition tamper, added files and private-only status. No real-data or browser validation claim."
+      "environment": "macOS x64 Node 20.20.1; five deterministic tests passed in under one second; CLI override privacy, options, confinement, links, app/data/source/edition tamper, added files and private-only status. No real-data or browser validation claim."
     },
     "local-2026-09-10-atlas-raster-service": {
       "kind": "local-measurement",

@@ -102,7 +102,7 @@ async function main() {
   for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => { void close().then(() => process.exit(0)); });
   try {
     if (cleanRevision() !== sourceRevision || JSON.stringify(dataIdentities(options["data-root"])) !== JSON.stringify(identities)) throw new Error("Source or data changed during startup.");
-    server = await preview({ configFile: false, envFile: false, root: webRoot, build: { outDir: app },
+    server = await preview({ configFile: false, envDir: false, root: webRoot, build: { outDir: app },
       preview: { host: "127.0.0.1", port: options.port ?? 4181, strictPort: true, headers: { "Cache-Control": "no-store", "Content-Encoding": "identity" } },
       plugins: [{ name: "sealed-local-demo", configurePreviewServer(active) { active.middlewares.use(runtime.middleware); } }],
     });

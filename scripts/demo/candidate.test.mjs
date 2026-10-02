@@ -1,9 +1,18 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { test } from "node:test";
 import { createOutput, DATA_IDENTITIES, dataIdentities, inventory, parseOptions, verifyCandidate } from "./candidate.mjs";
+
+test("CLI refuses inherited overrides before reading data and never prints their values", () => {
+  const result = spawnSync(process.execPath, [resolve(import.meta.dirname, "demo.mjs"), "preflight", "--data-root", "/absent-demo-data"],
+    { encoding: "utf8", env: { ...process.env, SEARISE_TEST_OVERRIDE: "private-test-sentinel" } });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Unset SEARISE_\*/);
+  assert.ok(!`${result.stdout}${result.stderr}`.includes("private-test-sentinel"));
+});
 
 test("CLI rejects unknown, repeated, missing, relative and invalid port options", () => {
   for (const args of [["--unknown", "x"], ["--data-root"], ["--data-root", "x"],
