@@ -121,6 +121,11 @@ jobs:
           cache: pip
           cache-dependency-path: contracts/supply-chain/v2/python/static-target-contributor-requirements.txt
 
+      - name: Install pinned npm
+        run: |
+          npm install --global npm@11.12.1
+          npm --version
+
       - name: Install dependencies
         run: npm ci
 

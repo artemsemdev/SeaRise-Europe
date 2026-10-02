@@ -41,6 +41,11 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         workflow_root = Path(__file__).resolve().parents[2]
         package = json.loads((workflow_root / "package.json").read_text())
         self.assertIn("npm run demo:test", package["scripts"]["web:check"])
+        workflow = (workflow_root / ".github/workflows/ci.yml").read_text()
+        web = _workflow_job(workflow, "web", "pipeline")
+        pinned_npm = f'npm install --global {package["packageManager"]}'
+        self.assertIn(pinned_npm, web)
+        self.assertLess(web.index(pinned_npm), web.index("run: npm ci"))
 
     def test_product_contract_changes_always_run_web_checks(self) -> None:
         for path in (

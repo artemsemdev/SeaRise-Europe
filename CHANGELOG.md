@@ -18,8 +18,8 @@ All notable changes to this project will be documented in this file.
   coastal raster tiles by marking every tile response `no-store`.
 - Made fixture city markers easier to tap and aligned the flood-layer control
   label with its accessible name.
-- Static-quality CI now installs the declared npm version for both the application
-  build and isolated Lighthouse tools.
+- Static Web and static-quality CI now install the declared npm version for
+  application checks, builds, and isolated Lighthouse tools.
 - Aligned contributor verification guidance with the atlas fixture and explicit
   provisioned local workflow, keeping AR6 reference checks separately scoped.
 - Kept return-to-place controls available on mobile and tablet map views.
