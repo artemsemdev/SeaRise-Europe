@@ -289,6 +289,9 @@ export function EuropeMap({
       zoom: initialCamera?.zoom ?? (initialCity ? CITY_ZOOM : EUROPE_ZOOM),
       pitch: 0,
       bearing: 0,
+      // Bound the canvas allocation on dense displays while keeping CSS layout
+      // and native raster sampling unchanged. DOM labels retain screen density.
+      pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
       minZoom: 0,
       maxZoom: MAP_MAX_ZOOM,
       // Preserve discrete scientific cells without making the data look smoother.
