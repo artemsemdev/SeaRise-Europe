@@ -42,6 +42,14 @@ COLORS = np.array(
 SHA256 = re.compile(r"^[a-f0-9]{64}$")
 
 
+class RasterHTTPServer(ThreadingHTTPServer):
+    """Threaded server for the atlas's read-only local HTTP surface."""
+
+    # A viewport can open dozens of distinct tile connections while native
+    # work delays accept(). Keep a bounded queue rather than resetting them.
+    request_queue_size = 64
+
+
 def stream_digest(path: Path) -> str:
     """Hash one raster in bounded memory."""
     digest = hashlib.sha256()
@@ -431,7 +439,7 @@ def main() -> None:
     )
     args = parser.parse_args()
     atlas = Atlas(args.data_root)
-    server = ThreadingHTTPServer((args.host, args.port), handler_for(atlas))
+    server = RasterHTTPServer((args.host, args.port), handler_for(atlas))
     print(
         json.dumps(
             {

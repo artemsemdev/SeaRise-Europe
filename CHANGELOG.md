@@ -4,7 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Authorized a separate, temporary private local demo performance exception
+  through the start of 16 October 2026 in Berlin. CI preserves the failed raw
+  90-point target and requires at least 50 performance in each of three cold
+  fixture audits, with 90 in every other category and healthy map rendering.
+  This does not qualify a scientific, public, or MVP release.
+
 ### Security
+
+- Patched the locked URI parser and development dependencies to resolve the
+  npm advisories found while preparing the local demonstration candidate.
 
 - Updated MapLibre GL JS and its transitive URI parser to patched versions and
   refreshed the active npm supply-chain profile and SBOM.
@@ -14,6 +25,15 @@ All notable changes to this project will be documented in this file.
 - Local demo shutdown now reaps the raster process even when interrupted before
   native startup finishes, preventing orphan services during candidate checks.
 
+- The coastal Atlas gives its controls a paint opportunity before cold map
+  initialization and bounds dense-display canvas allocation, reducing measured
+  local software-render startup cost while retaining the raw performance gate.
+
+- Fresh Lighthouse audits meeting every 90-point budget now pass independently
+  of the historical Atlas waiver; expired exceptions still cannot accept slow runs.
+
+- Kept real-local flood tiles available during rapid overview, reload, and zoom
+  requests by allowing a bounded queue of pending native service connections.
 - Prevented browsers and intermediaries from retaining private, locally derived
   coastal raster tiles by marking every tile response `no-store`.
 - Made fixture city markers easier to tap and aligned the flood-layer control
