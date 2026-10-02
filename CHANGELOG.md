@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
+- Patched the locked URI parser and development dependencies to resolve the
+  npm advisories found while preparing the local demonstration candidate.
+
 - Updated MapLibre GL JS and its transitive URI parser to patched versions and
   refreshed the active npm supply-chain profile and SBOM.
 
