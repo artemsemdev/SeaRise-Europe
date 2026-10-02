@@ -67,7 +67,7 @@ try {
       await chrome.kill();
     }
   }
-  const policy = JSON.parse(readFileSync(new URL("./atlas-local-performance-waiver.json", import.meta.url), "utf8"));
+  const policy = JSON.parse(readFileSync(new URL("./atlas-local-demo-performance-waiver.json", import.meta.url), "utf8"));
   const edition = readFileSync(resolve(dist, "index.html"), "utf8")
     .match(/<meta name="searise-atlas-edition" content="([^"]+)"/u)?.[1];
   const { releaseDisposition } = JSON.parse(readFileSync(resolve(dist, "build-identity.json"), "utf8"));

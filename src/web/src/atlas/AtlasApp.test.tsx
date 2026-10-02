@@ -41,6 +41,7 @@ afterEach(() => {
 async function ready(source = fakeDataSource()) {
   render(<AtlasApp dataSource={source} />);
   await waitFor(() => expect(screen.getByRole("button", { name: "Play timeline" })).toBeEnabled());
+  await screen.findByLabelText("Test map controls");
   return source;
 }
 
@@ -105,7 +106,7 @@ describe("provider-backed coastal atlas experience", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Play timeline" })).toBeEnabled());
     expect(source.getCatalog).toHaveBeenCalledTimes(2);
     vi.mocked(navigator.clipboard.writeText).mockRejectedValueOnce(new Error("Clipboard denied"));
-    fireEvent.click(screen.getByRole("button", { name: "Share map view" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Share map view" }));
     await screen.findByText("Copy the address in your browser to share this view.");
   });
 
