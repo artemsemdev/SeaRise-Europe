@@ -40,7 +40,7 @@ for (const [signal, ignoresTerm] of [["SIGTERM", false], ["SIGINT", false], ["SI
   try {
     fixture(root);
     const python = join(root, "interpreter-stub");
-    writeFileSync(python, `#!/usr/bin/env node\nrequire("node:fs").writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\nprocess.on("SIGTERM", () => ${ignoresTerm ? "{}" : "process.exit(0)"});\nsetInterval(() => {}, 1000);\n`);
+    writeFileSync(python, `#!/usr/bin/env node\nprocess.on("SIGTERM", () => ${ignoresTerm ? "{}" : "process.exit(0)"});\nrequire("node:fs").writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\nsetInterval(() => {}, 1000);\n`);
     chmodSync(python, 0o755);
     launcher = spawn(process.execPath, [resolve(import.meta.dirname, "demo.mjs"), "preflight", "--data-root", root, "--python", python], { stdio: ["ignore", "pipe", "pipe"] });
     const exited = once(launcher, "exit");
