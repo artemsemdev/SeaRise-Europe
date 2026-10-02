@@ -372,7 +372,7 @@
       "replacementEvidence": null,
       "layer": "integration",
       "owner": "data",
-      "purpose": "Keep the real-local atlas raster boundary read-only, path-confined, one-pass integrity checked, and exact about unknown, valid zero, flooded, and tile-count semantics.",
+      "purpose": "Keep the real-local atlas raster boundary read-only, path-confined, one-pass integrity checked, exact about unknown, valid zero, flooded, and tile-count semantics, and resilient to queued loopback tile connections.",
       "sourcePaths": [
         "scripts/atlas/europe_raster_service.py",
         "src/pipeline/tests/atlas/test_europe_raster_service.py"
@@ -384,7 +384,7 @@
       "disposition": "keep-permanently",
       "replacementGate": {
         "issue": null,
-        "evidenceRequired": "Permanent real-local raster integrity, confinement, native-cell point, tile-count, and route-surface gate."
+        "evidenceRequired": "Permanent real-local raster integrity, confinement, native-cell point, tile-count, route-surface, and bounded loopback connection-burst gate."
       },
       "commands": {
         "focused": "python -m pytest src/pipeline/tests/atlas/test_europe_raster_service.py -q",
@@ -408,7 +408,7 @@
         "owner": "data",
         "issue": null,
         "expiresAt": null,
-        "evidence": "Fixed three-cell EPSG:3035 rasters and in-process handler calls use temporary files only; no clock, network, browser, production data, or external executable is involved."
+        "evidence": "Fixed three-cell EPSG:3035 rasters use temporary files, in-process handler calls, and a loopback socket regression that queues 32 distinct tile connections before the accept loop starts. Bounded socket timeouts prevent hangs; no external network, browser, production data, or external executable is involved."
       }
     },
     {
