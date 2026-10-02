@@ -1,8 +1,20 @@
 {
   "$schema": "contracts/test-inventory.schema.json",
   "schemaVersion": "1.0.0",
-  "updatedAt": "2026-09-10",
+  "updatedAt": "2026-10-02",
   "evidence": {
+    "local-2026-10-02-demo-startup-shutdown": {
+      "kind": "local-measurement",
+      "observedAt": "2026-10-02T11:27:00Z",
+      "reference": "scripts/demo/startup-signal.test.mjs",
+      "environment": "Official Node 20.20.1/npm 11.12.1; genuine CLI SIGTERM/SIGINT startup checks use only temporary manifests, a place fixture and a PID-recording interpreter stub. Reproduce orphan before fix and verify graceful/forced child reaping after fix; no private data, Python, browser or socket required."
+    },
+    "local-2026-10-02-demo-candidate": {
+      "kind": "local-measurement",
+      "observedAt": "2026-10-02T10:33:00Z",
+      "reference": "scripts/demo/candidate.test.mjs",
+      "environment": "macOS x64 Node 20.20.1; five deterministic tests passed in under one second; CLI override privacy, options, confinement, links, app/data/source/edition tamper, added files and private-only status. No real-data or browser validation claim."
+    },
     "local-2026-09-10-atlas-raster-service": {
       "kind": "local-measurement",
       "observedAt": "2026-09-10T12:00:00+02:00",
@@ -366,13 +378,30 @@
   },
   "suites": [
     {
+      "id": "private-local-demo-candidate",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
+      "layer": "unit",
+      "owner": "platform",
+      "purpose": "Keep local demo app/data/source identities confined and fail closed without overwriting candidates or claiming public or MVP release readiness.",
+      "sourcePaths": ["scripts/demo/*.mjs", "src/web/scripts/release-delivery-middleware.*", "src/web/scripts/real-local-atlas.mjs"],
+      "changedPaths": ["scripts/demo/**", "src/web/scripts/release-delivery-middleware.*", "src/web/scripts/real-local-atlas.mjs", "src/web/scripts/serve-committed-release.mjs", "src/web/vite.config.ts", "package.json"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent private local demo integrity gate." },
+      "commands": { "focused": "npm run demo:test", "full": "npm run web:check" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 6, "class": "fast", "evidenceRef": "local-2026-10-02-demo-startup-shutdown", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Temporary files, deterministic identity checks, actual loopback HTTP delivery of synthetic bytes and genuine child-process signals with PID readiness and a bounded deadline; no provisioned datasets, scientific interpreter or browser." }
+    },
+    {
       "id": "atlas-real-local-raster-service",
       "status": "active",
       "removalGate": null,
       "replacementEvidence": null,
       "layer": "integration",
       "owner": "data",
-      "purpose": "Keep the real-local atlas raster boundary read-only, path-confined, one-pass integrity checked, and exact about unknown, valid zero, flooded, and tile-count semantics.",
+      "purpose": "Keep the real-local atlas raster boundary read-only, path-confined, one-pass integrity checked, exact about unknown, valid zero, flooded, and tile-count semantics, and resilient to queued loopback tile connections.",
       "sourcePaths": [
         "scripts/atlas/europe_raster_service.py",
         "src/pipeline/tests/atlas/test_europe_raster_service.py"
@@ -384,7 +413,7 @@
       "disposition": "keep-permanently",
       "replacementGate": {
         "issue": null,
-        "evidenceRequired": "Permanent real-local raster integrity, confinement, native-cell point, tile-count, and route-surface gate."
+        "evidenceRequired": "Permanent real-local raster integrity, confinement, native-cell point, tile-count, route-surface, and bounded loopback connection-burst gate."
       },
       "commands": {
         "focused": "python -m pytest src/pipeline/tests/atlas/test_europe_raster_service.py -q",
@@ -408,7 +437,7 @@
         "owner": "data",
         "issue": null,
         "expiresAt": null,
-        "evidence": "Fixed three-cell EPSG:3035 rasters and in-process handler calls use temporary files only; no clock, network, browser, production data, or external executable is involved."
+        "evidence": "Fixed three-cell EPSG:3035 rasters use temporary files, in-process handler calls, and a loopback socket regression that queues 32 distinct tile connections before the accept loop starts. Bounded socket timeouts prevent hangs; no external network, browser, production data, or external executable is involved."
       }
     },
     {
@@ -520,15 +549,15 @@
       "replacementEvidence": null,
       "layer": "integration",
       "owner": "platform",
-      "purpose": "Prove the production output works on a pinned generic static-file server, exposes only the two intended document routes and immutable build/release assets, returns static 404 responses for unknown and legacy application endpoints, and meets the >=90 Lighthouse mobile performance, accessibility, best-practices, and SEO budgets in Chromium.",
-      "sourcePaths": [".github/workflows/static-quality.yml", "src/web/scripts/generic-static-host.mjs", "src/web/scripts/generic-static-host.test.mjs", "src/web/scripts/lighthouse-budget.mjs", "src/web/scripts/lighthouse-budget.test.mjs", "tools/static-quality/atlas-local-performance-waiver.json", "tools/static-quality/validate-generic-static-host.mjs", "tools/static-quality/run-lighthouse-gate.mjs", "tools/static-quality/package.json", "tools/static-quality/package-lock.json", "src/web/scripts/inline-initial-styles.mjs", "src/web/scripts/precompress-static-build.mjs", "docs/operations/generic-static-host-validation.md"],
+      "purpose": "Prove generic static-host portability and raw >=90 Chromium Lighthouse budgets; retain explicit failed raw performance when the owner-approved, expiring local-demo fixture-only exception applies, never as public or scientific release qualification.",
+      "sourcePaths": [".github/workflows/static-quality.yml", "src/web/scripts/generic-static-host.mjs", "src/web/scripts/generic-static-host.test.mjs", "src/web/scripts/lighthouse-budget.mjs", "src/web/scripts/lighthouse-budget.test.mjs", "tools/static-quality/atlas-local-performance-waiver.json", "tools/static-quality/atlas-local-demo-performance-waiver.json", "tools/static-quality/validate-generic-static-host.mjs", "tools/static-quality/run-lighthouse-gate.mjs", "tools/static-quality/package.json", "tools/static-quality/package-lock.json", "src/web/scripts/inline-initial-styles.mjs", "src/web/scripts/precompress-static-build.mjs", "docs/operations/generic-static-host-validation.md"],
       "changedPaths": [".github/workflows/static-quality.yml", "contracts/release/v1/fixtures/release/**", "contracts/release/v2/fixtures/browser-release/**", "src/web/**", "tools/static-quality/**"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent generic static-host portability, static-route, zero-dynamic-endpoint, and Chromium Lighthouse quality gate." },
       "commands": { "focused": "npm run web:build && npm ci --prefix tools/static-quality && node tools/static-quality/validate-generic-static-host.mjs && node tools/static-quality/run-lighthouse-gate.mjs", "full": "npm run web:check && npm ci --prefix tools/static-quality && node tools/static-quality/validate-generic-static-host.mjs && node tools/static-quality/run-lighthouse-gate.mjs && npm run web:e2e" },
       "execution": { "tier": "release", "ciWorkflow": "static-quality.yml", "ciJob": "static-quality", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 65, "class": "slow", "evidenceRef": "local-2026-08-17-generic-static-lighthouse", "scope": "focused-suite" },
-      "flakiness": { "status": "environment-sensitive", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "A single simulated-mobile audit varied before initial Flight assets and release validation were moved off the render-critical path. The owned gate preserves three fresh raw reports, evaluates the raw median, and additionally rejects every individual category below 0.90. The final local performance evidence was 0.92/0.99/0.99 with 1.00 accessibility, 0.96 best practices, and 1.00 SEO in every run; no external service, data, or network is involved." }
+      "flakiness": { "status": "environment-sensitive", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Three fresh cold Atlas Chromium audits preserve individual raw and median budgets. Linux run 36998471253 measured performance 0.54/0.56/0.54 with all other categories 1.00; the public 0.90 target remains failed. The separately owner-approved local-demo fixture exception requires at least 0.50 in every performance run, 0.90 in every other category, healthy rendering and exact expiry, without authorizing scientific or public release. No external service, private data, or network is involved." }
     },
     {
       "id": "static-offline-contracts",
@@ -1807,6 +1836,9 @@
     }
   ],
   "baselineTests": [
+    { "path": "scripts/demo/startup-signal.test.mjs", "suite": "private-local-demo-candidate", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "scripts/demo/sealed-preview.test.mjs", "suite": "private-local-demo-candidate", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "scripts/demo/candidate.test.mjs", "suite": "private-local-demo-candidate", "status": "active", "removalGate": null, "replacementEvidence": null },
     {"path": "src/web/scripts/atlas-edition.test.mjs", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null},
     {"path": "src/web/tests/atlas-fixture.spec.ts", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null},
     {"path": "src/pipeline/tests/atlas/test_europe_raster_service.py", "suite": "atlas-real-local-raster-service", "status": "active", "removalGate": null, "replacementEvidence": null},

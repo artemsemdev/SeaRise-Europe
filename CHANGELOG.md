@@ -4,19 +4,47 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Authorized a separate, temporary private local demo performance exception
+  through the start of 16 October 2026 in Berlin. CI preserves the failed raw
+  90-point target and requires at least 50 performance in each of three cold
+  fixture audits, with 90 in every other category and healthy map rendering.
+  This does not qualify a scientific, public, or MVP release.
+
 ### Security
+
+- Patched the locked URI parser and development dependencies to resolve the
+  npm advisories found while preparing the local demonstration candidate.
 
 - Updated MapLibre GL JS and its transitive URI parser to patched versions and
   refreshed the active npm supply-chain profile and SBOM.
 
 ### Fixed
 
+- Restored the local demo’s labeled synthetic projection reference by allowing
+  verified static application caching and preserving exact release byte ranges
+  and manifest identities. Private Atlas data, basemap and error responses stay
+  `no-store`; the reference now uses the application icon without a favicon error.
+
+- Local demo shutdown now reaps the raster process even when interrupted before
+  native startup finishes, preventing orphan services during candidate checks.
+
+- The coastal Atlas gives its controls a paint opportunity before cold map
+  initialization and bounds dense-display canvas allocation, reducing measured
+  local software-render startup cost while retaining the raw performance gate.
+
+- Fresh Lighthouse audits meeting every 90-point budget now pass independently
+  of the historical Atlas waiver; expired exceptions still cannot accept slow runs.
+
+- Kept real-local flood tiles available during rapid overview, reload, and zoom
+  requests by allowing a bounded queue of pending native service connections.
 - Prevented browsers and intermediaries from retaining private, locally derived
   coastal raster tiles by marking every tile response `no-store`.
 - Made fixture city markers easier to tap and aligned the flood-layer control
   label with its accessible name.
-- Static-quality CI now installs the declared npm version for both the application
-  build and isolated Lighthouse tools.
+- Static Web and static-quality CI now install the declared npm version for
+  application checks, builds, and isolated Lighthouse tools.
 - Aligned contributor verification guidance with the atlas fixture and explicit
   provisioned local workflow, keeping AR6 reference checks separately scoped.
 - Kept return-to-place controls available on mobile and tablet map views.
@@ -33,6 +61,11 @@ All notable changes to this project will be documented in this file.
   routing.
 
 ### Added
+
+- Added private local demo candidates with a pinned source revision, read-only
+  application files, app/data identity checks, and explicit loopback launch.
+  CoCliCo rasters and basemap data stay outside the candidate; this workflow
+  does not qualify an MVP, scientific, or public release.
 
 - Added the accepted coastal atlas interface behind an injected data source,
   preserving city search, point inspection, comparison, shared views, and

@@ -225,7 +225,7 @@ function serveRange(request, response, path, contentType) {
     "Content-Type": contentType,
     "Content-Length": end - start + 1,
     "Accept-Ranges": "bytes",
-    "Cache-Control": "private, no-cache",
+    "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
     ...(match ? { "Content-Range": `bytes ${start}-${end}/${size}` } : {}),
   });

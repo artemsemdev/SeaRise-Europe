@@ -60,6 +60,9 @@ for data roots, Python selection, local build/preview commands, and the separate
 manual browser journeys. `npm run web:dev` always selects the fixture, even when
 private data is present on disk.
 
+For a sealed local demonstration build with source/data identity checks, follow
+the [candidate runbook](docs/operations/local-demo-candidate.md).
+
 ## Product and reference contracts
 
 The current application follows the [coastal atlas requirements](docs/product/COASTAL_ATLAS_PRD.md),

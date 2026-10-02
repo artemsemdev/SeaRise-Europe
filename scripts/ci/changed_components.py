@@ -37,6 +37,7 @@ WEB = (
     "package-lock.json",
     "contracts/repository-removal/v1/historical-allowlist*.json",
     "src/web/**",
+    "scripts/demo/**",
     "scripts/atlas/**",
     "data/cartography/**",
     "tools/static-quality/**",
@@ -127,6 +128,7 @@ REPOSITORY_REMOVAL = (
 
 CODEQL_JAVASCRIPT = (
     'src/web/**',
+    'scripts/demo/**',
     'tools/static-quality/**',
 )
 

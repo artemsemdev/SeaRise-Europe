@@ -121,6 +121,7 @@ const pendingRemovalPaths = Object.freeze([
 const legacyPipelineAdapters = /^src\/pipeline\/(?:__init__|cogify|compute_exposure|config|download|preprocess|register|run_pipeline|upload|validate)\.py$/u;
 const mustDeletePrefixes = Object.freeze(["src/api/", "src/frontend/", "infra/db/", "infra/blob-seed/"]);
 const exactRetainedRulePurpose = new Map([
+  ["scripts/demo/sealed-preview.test.mjs", new Map([["node-production-server", new Set(["createserver("])]])],
   ["src/web/package.json", new Map([["node-production-server", new Set(["vite preview"])]])],
   ["src/web/scripts/measure-ar6-release.mjs", new Map([["node-production-server", new Set(["createserver("])]])],
   ["src/web/scripts/measure-local-candidate-search.mjs", new Map([["node-production-server", new Set(["createserver("])]])],

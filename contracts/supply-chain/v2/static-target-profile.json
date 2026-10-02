@@ -111,7 +111,7 @@
         {
           "path": "contracts/supply-chain/v2/sboms/static-web-npm.cdx.json",
           "role": "sbom",
-          "sha256": "6b66ac47ae5ff2a90e6061c75a86876e0fcfd6a3b503d67146b573bc33f2b8d0"
+          "sha256": "a3dfd82dd6443c48b467766c75462a7225213d7c8c551d046cee7e2a9b6dbe90"
         }
       ]
     },
@@ -124,7 +124,7 @@
         {
           "path": ".github/workflows/ci.yml",
           "role": "workflow",
-          "sha256": "5e8616ba4ea08158785ec6ebd55ebb3273a7d387ed6b079b041def7ea2c0eb55"
+          "sha256": "cc63d4be24c909f98f2e94ea93704bbc827d46f145d1cddada5c7708138273b1"
         },
         {
           "path": ".github/workflows/codeql.yml",
@@ -424,17 +424,17 @@
         {
           "path": "package-lock.json",
           "role": "lock",
-          "sha256": "019a034af8b22c29b3f97e4b8bc77add293bcd353a09d539216a7a90587b2e06"
+          "sha256": "29a68b25227ed9e85a574402e9a16779345c4d1ee600fe5751a828390a14089d"
         },
         {
           "path": "package.json",
           "role": "manifest",
-          "sha256": "659dd996fc778597d83c9d237cd589ca2b8fc7d811d57b93e69eef5b2b4ef366"
+          "sha256": "e527519c3f7a3fd9b57120eb85eabd37391ac7d7f8e793664e703dddc1a4f3ae"
         },
         {
           "path": "src/web/package.json",
           "role": "manifest",
-          "sha256": "af2bc764298a4b300a9fc0ad0e6546f5273f0799bdcf0c7e30c6e48340a4937f"
+          "sha256": "11bee1e7140d519fd278084c1002e4624e56d08eb15ec570bebd29967c057261"
         }
       ]
     },

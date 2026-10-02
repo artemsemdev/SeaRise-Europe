@@ -129,6 +129,21 @@ describe("static repository dependency gates", () => {
     expect(scanDependencyRecords(records, { mode: "target" }).violations).toHaveLength(1);
   });
 
+  it("retains only the exact synthetic demo HTTP test server token", () => {
+    const path = "scripts/demo/sealed-preview.test.mjs";
+    const records = [{ path, text: "createServer(handler)" }];
+    for (const mode of ["target", "repository-final"]) {
+      const result = scanDependencyRecords(records, { mode });
+      expect(result.findings[0].classification).toBe("retained-test-tooling");
+      expect(result.violations).toHaveLength(0);
+      expect(scanDependencyRecords([{ path, text: '{"express":"5.0.0"}' }], { mode }).violations)
+        .toHaveLength(1);
+      expect(scanDependencyRecords([{ path: "scripts/demo/production.mjs", text: "createServer(app)" }], { mode }).violations)
+        .toHaveLength(1);
+    }
+    expect(scanDependencyRecords(records, { mode: "built" }).violations).toHaveLength(1);
+  });
+
   it("rejects a root target manifest that restores Next.js", () => {
     const records = [{ path: "package.json", text: '{"dependencies":{"next":"14.2.0"}}' }];
     expect(scanDependencyRecords(records, { mode: "target" }).violations[0].rule).toBe("nextjs-runtime");
