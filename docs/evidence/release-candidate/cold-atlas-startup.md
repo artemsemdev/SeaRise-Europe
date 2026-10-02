@@ -69,6 +69,7 @@ errors, incomplete audits, and any attempt to broaden the historical policy.
 The Atlas unit suite awaits both the catalogue and map mount, exercising city
 selection, selected-point inspection, defense/year changes, shared views,
 comparison, and errors with the existing injected data-source contract. The
-fixture browser journeys retain their real rendered-map checks, all six
-combinations, and the selected-view screenshots. No timing-only assertion is
+fixture browser journeys retain their real rendered-map checks, representative
+year/defense transitions, and selected-view screenshots. The existing fixture
+unit suite checks all six configured year/defense combinations. No timing-only assertion is
 used as a replacement for render health.
