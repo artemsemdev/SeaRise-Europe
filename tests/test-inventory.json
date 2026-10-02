@@ -1,8 +1,14 @@
 {
   "$schema": "contracts/test-inventory.schema.json",
   "schemaVersion": "1.0.0",
-  "updatedAt": "2026-09-10",
+  "updatedAt": "2026-10-02",
   "evidence": {
+    "local-2026-10-02-demo-candidate": {
+      "kind": "local-measurement",
+      "observedAt": "2026-10-02T10:33:00Z",
+      "reference": "scripts/demo/candidate.test.mjs",
+      "environment": "macOS x64 Node 20.20.1; four deterministic temporary-file tests passed in under one second; options, confinement, links, app/data/source/edition tamper, added files and private-only status. No real-data or browser validation claim."
+    },
     "local-2026-09-10-atlas-raster-service": {
       "kind": "local-measurement",
       "observedAt": "2026-09-10T12:00:00+02:00",
@@ -365,6 +371,23 @@
     }
   },
   "suites": [
+    {
+      "id": "private-local-demo-candidate",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
+      "layer": "unit",
+      "owner": "platform",
+      "purpose": "Keep local demo app/data/source identities confined and fail closed without overwriting candidates or claiming public or MVP release readiness.",
+      "sourcePaths": ["scripts/demo/*.mjs"],
+      "changedPaths": ["scripts/demo/**", "package.json"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent private local demo integrity gate." },
+      "commands": { "focused": "npm run demo:test", "full": "npm run web:check" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-10-02-demo-candidate", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Temporary files and deterministic options/identity checks; no provisioned datasets, interpreter, browser or loopback binding." }
+    },
     {
       "id": "atlas-real-local-raster-service",
       "status": "active",
@@ -1807,6 +1830,7 @@
     }
   ],
   "baselineTests": [
+    { "path": "scripts/demo/candidate.test.mjs", "suite": "private-local-demo-candidate", "status": "active", "removalGate": null, "replacementEvidence": null },
     {"path": "src/web/scripts/atlas-edition.test.mjs", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null},
     {"path": "src/web/tests/atlas-fixture.spec.ts", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null},
     {"path": "src/pipeline/tests/atlas/test_europe_raster_service.py", "suite": "atlas-real-local-raster-service", "status": "active", "removalGate": null, "replacementEvidence": null},

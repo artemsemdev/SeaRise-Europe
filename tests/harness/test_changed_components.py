@@ -33,6 +33,15 @@ def _workflow_event_paths(workflow: str, event: str, next_event: str) -> set[str
 
 
 class ChangedComponentRoutingTests(unittest.TestCase):
+    def test_private_demo_tooling_routes_web_and_javascript_checks(self) -> None:
+        outputs = classify_paths(["scripts/demo/demo.mjs"])
+        self.assertTrue(outputs["web"])
+        self.assertTrue(outputs["codeql_javascript"])
+        self.assertFalse(outputs["release"])
+        workflow_root = Path(__file__).resolve().parents[2]
+        package = json.loads((workflow_root / "package.json").read_text())
+        self.assertIn("npm run demo:test", package["scripts"]["web:check"])
+
     def test_product_contract_changes_always_run_web_checks(self) -> None:
         for path in (
             "docs/product/PRD.md",

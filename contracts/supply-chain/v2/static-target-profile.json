@@ -429,7 +429,7 @@
         {
           "path": "package.json",
           "role": "manifest",
-          "sha256": "659dd996fc778597d83c9d237cd589ca2b8fc7d811d57b93e69eef5b2b4ef366"
+          "sha256": "e527519c3f7a3fd9b57120eb85eabd37391ac7d7f8e793664e703dddc1a4f3ae"
         },
         {
           "path": "src/web/package.json",

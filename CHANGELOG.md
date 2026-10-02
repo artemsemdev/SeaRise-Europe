@@ -34,6 +34,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added private local demo candidates with a pinned source revision, read-only
+  application files, app/data identity checks, and explicit loopback launch.
+  CoCliCo rasters and basemap data stay outside the candidate; this workflow
+  does not qualify an MVP, scientific, or public release.
+
 - Added the accepted coastal atlas interface behind an injected data source,
   preserving city search, point inspection, comparison, shared views, and
   mobile controls. The software fixture is visibly identified.
