@@ -10,6 +10,7 @@ is at `/projections/`.
 | What are we building? | [Coastal atlas requirements](product/COASTAL_ATLAS_PRD.md), [design](product/COASTAL_ATLAS_DESIGN.md), [copy](product/COASTAL_ATLAS_CONTENT.md) |
 | What changed architecturally? | [Atlas adoption decision](architecture/adr/ADR-028-coastal-atlas-adoption.md) |
 | How do I run the atlas? | [Fixture and provisioned local quickstart](operations/coastal-atlas-development.md) |
+| How do I prepare a local demo candidate? | [Candidate preparation, demonstration and rollback](operations/local-demo-candidate.md) |
 | How do I contribute today? | [Contributor commands](../CONTRIBUTING.md), [testing](testing/README.md) |
 | What is implemented? | [Architecture overview](architecture/README.md); guides change with each implementation PR |
 | What remains? | [Atlas adoption epic](https://github.com/artemsemdev/SeaRise-Europe/issues/490); public hosting is a later workstream |
