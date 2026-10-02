@@ -5,6 +5,7 @@ import { atlasMainRepositoryRoot, createRealLocalAtlas } from "../../src/web/scr
 import { assertByteAffectingRuntime } from "../../src/web/scripts/search-shard-builder.mjs";
 import { createOutput, dataIdentities, inventory, parseOptions, seal, verifyCandidate } from "./candidate.mjs";
 import { createLifecycle } from "./lifecycle.mjs";
+import { sealedPreviewConfig } from "./sealed-preview.mjs";
 
 const repositoryRoot = resolve(import.meta.dirname, "../..");
 const webRoot = resolve(repositoryRoot, "src/web");
@@ -106,13 +107,8 @@ async function main() {
   const runtime = await localAtlas(options);
   try {
     if (cleanRevision() !== sourceRevision || JSON.stringify(dataIdentities(options["data-root"])) !== JSON.stringify(identities)) throw new Error("Source or data changed during startup.");
-    await preview({ configFile: false, envDir: false, root: webRoot, build: { outDir: app },
-      preview: { host: "127.0.0.1", port: options.port ?? 4181, strictPort: true, headers: { "Cache-Control": "no-store", "Content-Encoding": "identity" } },
-      plugins: [{ name: "sealed-local-demo", configurePreviewServer(active) {
-        lifecycle.addCloser(() => active.close());
-        active.middlewares.use(runtime.middleware);
-      } }],
-    });
+    await preview(sealedPreviewConfig({ webRoot, app, port: options.port ?? 4181,
+      middleware: runtime.middleware, close: (active) => lifecycle.addCloser(() => active.close()) }));
     console.log(`Private local demo ${sourceRevision}: http://127.0.0.1:${options.port ?? 4181}`);
     console.log("publicPromotionAuthorized=false mvpRelease=false; stop with Ctrl+C");
   } catch (error) { await lifecycle.close(); throw error; }

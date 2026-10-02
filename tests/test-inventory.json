@@ -385,14 +385,14 @@
       "layer": "unit",
       "owner": "platform",
       "purpose": "Keep local demo app/data/source identities confined and fail closed without overwriting candidates or claiming public or MVP release readiness.",
-      "sourcePaths": ["scripts/demo/*.mjs"],
-      "changedPaths": ["scripts/demo/**", "package.json"],
+      "sourcePaths": ["scripts/demo/*.mjs", "src/web/scripts/release-delivery-middleware.*", "src/web/scripts/real-local-atlas.mjs"],
+      "changedPaths": ["scripts/demo/**", "src/web/scripts/release-delivery-middleware.*", "src/web/scripts/real-local-atlas.mjs", "src/web/scripts/serve-committed-release.mjs", "src/web/vite.config.ts", "package.json"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent private local demo integrity gate." },
       "commands": { "focused": "npm run demo:test", "full": "npm run web:check" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 6, "class": "fast", "evidenceRef": "local-2026-10-02-demo-startup-shutdown", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Temporary files, deterministic identity checks and genuine child-process signals with PID readiness and a bounded deadline; no provisioned datasets, scientific interpreter, browser or loopback binding." }
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Temporary files, deterministic identity checks, actual loopback HTTP delivery of synthetic bytes and genuine child-process signals with PID readiness and a bounded deadline; no provisioned datasets, scientific interpreter or browser." }
     },
     {
       "id": "atlas-real-local-raster-service",
@@ -1837,6 +1837,7 @@
   ],
   "baselineTests": [
     { "path": "scripts/demo/startup-signal.test.mjs", "suite": "private-local-demo-candidate", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "scripts/demo/sealed-preview.test.mjs", "suite": "private-local-demo-candidate", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "scripts/demo/candidate.test.mjs", "suite": "private-local-demo-candidate", "status": "active", "removalGate": null, "replacementEvidence": null },
     {"path": "src/web/scripts/atlas-edition.test.mjs", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null},
     {"path": "src/web/tests/atlas-fixture.spec.ts", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null},
