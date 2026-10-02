@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "scope": "coastal-atlas-private-local-demo",
+  "edition": "synthetic-fixture",
+  "releaseDisposition": "synthetic-fixture",
+  "owner": "artemsemdev",
+  "issues": [518, 519],
+  "sourceRun": "https://github.com/artemsemdev/SeaRise-Europe/actions/runs/36998471253",
+  "measuredPerformance": [0.54, 0.56, 0.54],
+  "target": 0.9,
+  "minimumPerformance": 0.5,
+  "expiresAt": "2026-10-16T00:00:00+02:00",
+  "publicPromotionAuthorized": false,
+  "mvpRelease": false,
+  "ownerApproval": {
+    "channel": "owner-chat",
+    "date": "2026-10-02",
+    "summary": "The project owner approved keeping the current performance for the private local demonstration under this temporary exception. This records the owner conversation, not an external or scientific signoff."
+  },
+  "rationale": "Permit the private local demonstration while cold Atlas performance remains below the unchanged public 90-point target. CI uses only the labeled illustrative fixture as software evidence, never real-data, scientific, public, or MVP release qualification."
+}

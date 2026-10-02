@@ -73,10 +73,27 @@ The independent raw 90-point target remains unmet.
 contains the complete reports and has the workflow's 14-day retention. This
 failed audit is evidence of remaining debt, not a passed public release gate.
 
+## Owner-approved local demo exception
+
+On 2026-10-02 the owner explicitly approved keeping the current performance for
+the private local demonstration. This approval is recorded from the owner
+conversation, with no external or scientific signoff claimed. A separate
+[local-demo policy](../../../tools/static-quality/atlas-local-demo-performance-waiver.json)
+uses the Linux evidence above and issues #518/#519. It permits only labeled
+synthetic fixture software evidence, requires 50 in every cold performance run
+and 90 in every other category, and expires at the start of 16 October in Berlin,
+`2026-10-16T00:00:00+02:00`. Render health and raw errors remain blocking.
+The historical September policy is preserved unchanged. CI acceptance under
+the new exception still reports `performance90Passed: false`, retains the raw
+90-point failures, and does not qualify private data, a scientific release,
+public promotion or an MVP release. Fresh CI remains required for the new head.
+
 ## Verification
 
 The independent Lighthouse evaluator regression failed three tests before its
-fix and passes all 16 policy cases afterward. It accepts raw 90-point passes
+fix and passes all 16 historical/raw policy cases afterward. Six additional
+local-demo cases enforce the owner scope, raw floors, other categories, exact
+Berlin expiry boundary, renderer errors and release identities. It accepts raw 90-point passes
 without consuming a waiver, and still rejects expired exceptions, render
 errors, incomplete audits, and any attempt to broaden the historical policy.
 

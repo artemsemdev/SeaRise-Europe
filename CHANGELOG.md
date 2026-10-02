@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Authorized a separate, temporary private local demo performance exception
+  through the start of 16 October 2026 in Berlin. CI preserves the failed raw
+  90-point target and requires at least 50 performance in each of three cold
+  fixture audits, with 90 in every other category and healthy map rendering.
+  This does not qualify a scientific, public, or MVP release.
+
 ### Security
 
 - Updated MapLibre GL JS and its transitive URI parser to patched versions and

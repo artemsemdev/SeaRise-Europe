@@ -49,7 +49,7 @@ browser preflight. Each audit starts its own new browser without an application
 preflight or shader-cache warming and rejects application errors in its console evidence. Performance, accessibility,
 best practices, and SEO must each have a median raw score of at least 0.90;
 the stricter guard also checks every individual raw score against 0.90. The
-bounded local-adoption performance exception below retains these failed targets
+bounded local-demo performance exception below retains these failed targets
 in evidence instead of reporting them as passes. Reports
 and the machine-readable run/median summary are written beneath the ignored
 `src/web/test-results/lighthouse/` directory. The isolated
@@ -84,10 +84,38 @@ installation, missing build output, unexpected
 dynamic route, or failed audit is a blocking failure rather than a deferral.
 
 
-## Temporary Atlas local-adoption performance exception
+## Temporary private local demo performance exception
+
+Owner **artemsemdev** explicitly approved keeping the current performance for
+the private local demonstration in the owner conversation on **2026-10-02**.
+This records that conversation; it is not an external or scientific signoff.
+The separate [checked local-demo policy](../../tools/static-quality/atlas-local-demo-performance-waiver.json)
+references [#518](https://github.com/artemsemdev/SeaRise-Europe/issues/518) and
+[#519](https://github.com/artemsemdev/SeaRise-Europe/issues/519), based on
+[Linux run 36998471253](https://github.com/artemsemdev/SeaRise-Europe/actions/runs/36998471253):
+raw performance **54 / 56 / 54**, with 100 in every other category.
+
+It expires at **2026-10-16T00:00:00+02:00**, the start of 16 October in Berlin
+(15 October 22:00 UTC), without automatic renewal. Every one of three cold runs
+must achieve **50 performance** and **90 in each other category**; renderer
+errors and invalid or incomplete evidence remain fatal. CI applies it only to
+the visibly labeled `synthetic-fixture` with synthetic release identity. These
+audits are software evidence for the local demo, not verification of its private
+CoCliCo data. Real-local, scientific, private-engineering and public-promoted
+identities cannot consume it. The policy explicitly keeps
+`publicPromotionAuthorized: false` and `mvpRelease: false`.
+
+The raw reports still fail the unchanged public performance target of **90**.
+The summary retains those failures, `performance90Passed: false`, the actual
+policy and scores, and `waiverApplied: true`; CI emits a warning identifying the
+local-demo scope, owner, issues, floor and expiry. An accepted local-demo gate
+does not qualify a scientific, public, or MVP release. Full raw passes consume
+neither exception. The historical policy below remains unchanged and expired.
+
+## Historical Atlas local-adoption performance exception
 
 Owner: **artemsemdev**. Issues: [#490](https://github.com/artemsemdev/SeaRise-Europe/issues/490)
-and [#65](https://github.com/artemsemdev/SeaRise-Europe/issues/65). Expires at
+and [#65](https://github.com/artemsemdev/SeaRise-Europe/issues/65). Expired at
 **2026-09-24 00:00 UTC**, with no automatic renewal.
 
 [Linux run 34493541004](https://github.com/artemsemdev/SeaRise-Europe/actions/runs/34493541004)

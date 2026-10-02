@@ -12,6 +12,62 @@ const input = (values = [0.54, 0.53, 0.55]) => ({
   } })),
 });
 
+describe("owner-approved private local demo exception", () => {
+  const demoPolicy = JSON.parse(readFileSync(resolve("../../tools/static-quality/atlas-local-demo-performance-waiver.json")));
+  const demo = (values = [0.54, 0.56, 0.54]) => ({ ...input(values),
+    policy: globalThis.structuredClone(demoPolicy), now: Date.parse("2026-10-02T12:00:00Z"),
+  });
+  it("accepts measured local-demo evidence while retaining every raw 90 failure", () => {
+    const value = demo();
+    const result = evaluateLighthouseBudget(value);
+    expect(result).toMatchObject({ accepted: true, waiverApplied: true, performance90Passed: false,
+      target: 0.9, medianScores: { performance: 0.54 }, waiver: demoPolicy });
+    expect(result.failedBudgets).toEqual(["median performance", "run 1 performance", "run 2 performance", "run 3 performance"]);
+    expect(result.warning).toMatch(/local-demo.*#518\/#519/u);
+    expect(value.runs.map(({ scores }) => scores.performance)).toEqual([0.54, 0.56, 0.54]);
+  });
+  it("requires 50 in each cold run and 90 in every other category", () => {
+    expect(evaluateLighthouseBudget(demo([0.5, 0.5, 0.5])).accepted).toBe(true);
+    expect(evaluateLighthouseBudget(demo([0.499, 0.95, 1])).accepted).toBe(false);
+    for (const category of ["accessibility", "best-practices", "seo"]) {
+      const value = demo(); value.runs[0].scores[category] = 0.899;
+      expect(evaluateLighthouseBudget(value).accepted).toBe(false);
+    }
+  });
+  it("expires at the start of 16 October in Berlin without renewal", () => {
+    const boundary = Date.parse("2026-10-15T22:00:00Z");
+    expect(evaluateLighthouseBudget({ ...demo(), now: boundary - 1 }).accepted).toBe(true);
+    for (const now of [boundary, boundary + 1, NaN]) {
+      expect(() => evaluateLighthouseBudget({ ...demo(), now })).toThrow(/expired|clock/u);
+    }
+  });
+  it("rejects broadening the approval, scope, release flags or measured authority", () => {
+    for (const change of [{ owner: "someone-else" }, { schemaVersion: 2 },
+      { scope: "public-release" }, { edition: "public-promoted" }, { ownerApproval: undefined },
+      { ownerApproval: { ...demoPolicy.ownerApproval, channel: "external-signoff" } },
+      { ownerApproval: { ...demoPolicy.ownerApproval, date: "2026-10-03" } },
+      { ownerApproval: { ...demoPolicy.ownerApproval, summary: "" } },
+      { issues: [65, 490] }, { sourceRun: policy.sourceRun }, { measuredPerformance: [0.5, 0.5, 0.5] },
+      { minimumPerformance: 0.49 }, { target: 0.5 }, { expiresAt: "2026-10-17T00:00:00+02:00" },
+      { publicPromotionAuthorized: true }, { mvpRelease: true }, { extra: true }]) {
+      expect(() => evaluateLighthouseBudget({ ...demo(), policy: { ...demoPolicy, ...change } })).toThrow(/policy/u);
+    }
+  });
+  it("cannot qualify real-local, scientific, private engineering or public identities", () => {
+    for (const identity of ["real-local", "scientific", "private-engineering", "public-promoted", undefined]) {
+      expect(() => evaluateLighthouseBudget({ ...demo(), edition: identity })).toThrow(/labeled/u);
+      expect(() => evaluateLighthouseBudget({ ...demo(), releaseDisposition: identity })).toThrow(/labeled/u);
+    }
+  });
+  it("rejects renderer errors, incomplete runs and invalid raw identities before the waiver", () => {
+    const value = demo(); value.runs[0].renderErrors.push("WebGL failed");
+    expect(() => evaluateLighthouseBudget(value)).toThrow(/render/u);
+    expect(() => evaluateLighthouseBudget({ ...demo(), runs: demo().runs.slice(1) })).toThrow(/three raw/u);
+    const bad = demo(); bad.runs[0].run = 2;
+    expect(() => evaluateLighthouseBudget(bad)).toThrow(/identity/u);
+  });
+});
+
 describe("temporary local Atlas performance waiver", () => {
   it("preserves the Linux raw failures and reports a waiver, never a 90-point pass", () => {
     const value = input(), result = evaluateLighthouseBudget(value);

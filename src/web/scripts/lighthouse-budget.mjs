@@ -1,6 +1,7 @@
 const categories = ["performance", "accessibility", "best-practices", "seo"];
 const target = 0.9;
 const expiry = "2026-09-24T00:00:00Z";
+const demoExpiry = "2026-10-16T00:00:00+02:00";
 const policyKeys = ["schemaVersion", "scope", "edition", "releaseDisposition", "owner", "issues", "sourceRun", "measuredPerformance", "target", "minimumPerformance", "expiresAt", "rationale"].sort();
 
 function requireCondition(condition, message) {
@@ -28,16 +29,24 @@ export function evaluateLighthouseBudget({ runs, policy, edition, releaseDisposi
     target, medianScores, failedBudgets, performance90Passed,
     waiverApplied: false, accepted: true, waiver: null, warning: null,
   };
-  requireCondition(policy && Object.keys(policy).sort().join() === policyKeys.join(), "missing or malformed waiver policy");
-  requireCondition(policy.schemaVersion === 1 && policy.scope === "coastal-atlas-local-adoption"
+  const localDemo = policy?.scope === "coastal-atlas-private-local-demo";
+  const expectedKeys = localDemo ? [...policyKeys, "ownerApproval", "publicPromotionAuthorized", "mvpRelease"].sort() : policyKeys;
+  requireCondition(policy && Object.keys(policy).sort().join() === expectedKeys.join(), "missing or malformed waiver policy");
+  requireCondition(policy.schemaVersion === 1
+    && policy.scope === (localDemo ? "coastal-atlas-private-local-demo" : "coastal-atlas-local-adoption")
     && policy.edition === "synthetic-fixture" && policy.releaseDisposition === "synthetic-fixture"
-    && policy.owner === "artemsemdev" && JSON.stringify(policy.issues) === "[65,490]"
-    && policy.sourceRun === "https://github.com/artemsemdev/SeaRise-Europe/actions/runs/34493541004"
-    && JSON.stringify(policy.measuredPerformance) === "[0.54,0.53,0.55]"
-    && policy.target === target && policy.minimumPerformance === 0.5 && policy.expiresAt === expiry
+    && policy.owner === "artemsemdev" && JSON.stringify(policy.issues) === (localDemo ? "[518,519]" : "[65,490]")
+    && policy.sourceRun === `https://github.com/artemsemdev/SeaRise-Europe/actions/runs/${localDemo ? "36998471253" : "34493541004"}`
+    && JSON.stringify(policy.measuredPerformance) === (localDemo ? "[0.54,0.56,0.54]" : "[0.54,0.53,0.55]")
+    && policy.target === target && policy.minimumPerformance === 0.5 && policy.expiresAt === (localDemo ? demoExpiry : expiry)
     && typeof policy.rationale === "string" && policy.rationale.trim().length >= 40,
   "waiver policy exceeds its reviewed scope");
-  requireCondition(Number.isFinite(now) && now < Date.parse(expiry), "waiver policy expired or clock is invalid");
+  if (localDemo) requireCondition(policy.publicPromotionAuthorized === false && policy.mvpRelease === false
+    && policy.ownerApproval && Object.keys(policy.ownerApproval).sort().join() === "channel,date,summary"
+    && policy.ownerApproval.channel === "owner-chat" && policy.ownerApproval.date === "2026-10-02"
+    && typeof policy.ownerApproval.summary === "string" && policy.ownerApproval.summary.trim().length >= 40,
+  "local-demo policy requires the recorded owner approval and private-only release flags");
+  requireCondition(Number.isFinite(now) && now < Date.parse(policy.expiresAt), "waiver policy expired or clock is invalid");
   requireCondition(edition === "synthetic-fixture" && releaseDisposition === "synthetic-fixture", "waiver requires the labeled synthetic Atlas fixture, never a private or public release");
   const waiverApplied = !performance90Passed && runs.every(({ scores }) =>
     scores.performance >= policy.minimumPerformance && categories.slice(1).every((id) => scores[id] >= target));
@@ -45,6 +54,6 @@ export function evaluateLighthouseBudget({ runs, policy, edition, releaseDisposi
     target, medianScores, failedBudgets, performance90Passed, waiverApplied,
     accepted: failedBudgets.length === 0 || waiverApplied,
     waiver: waiverApplied ? policy : null,
-    warning: waiverApplied ? `Lighthouse performance 90 failed; temporary local-adoption waiver applied. Raw performance: ${runs.map(({ scores }) => (scores.performance * 100).toFixed(2)).join("/")}; median ${(medianScores.performance * 100).toFixed(2)}; floor 50 each run; owner ${policy.owner}; expires ${expiry}; issues #65/#490. Not public MVP or release qualification.` : null,
+    warning: waiverApplied ? `Lighthouse performance 90 failed; temporary ${localDemo ? "local-demo" : "local-adoption"} waiver applied. Raw performance: ${runs.map(({ scores }) => (scores.performance * 100).toFixed(2)).join("/")}; median ${(medianScores.performance * 100).toFixed(2)}; floor 50 each run; owner ${policy.owner}; expires ${policy.expiresAt}; issues ${policy.issues.map((issue) => `#${issue}`).join("/")}. Not scientific, public or MVP release qualification.` : null,
   };
 }
