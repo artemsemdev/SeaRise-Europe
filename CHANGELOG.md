@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file.
 - Fresh Lighthouse audits meeting every 90-point budget now pass independently
   of the historical Atlas waiver; expired exceptions still cannot accept slow runs.
 
+- Kept real-local flood tiles available during rapid overview, reload, and zoom
+  requests by allowing a bounded queue of pending native service connections.
 - Prevented browsers and intermediaries from retaining private, locally derived
   coastal raster tiles by marking every tile response `no-store`.
 - Made fixture city markers easier to tap and aligned the flood-layer control

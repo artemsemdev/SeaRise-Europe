@@ -6,9 +6,12 @@ import hashlib
 import importlib.util
 import json
 import math
+import socket
 import struct
 import sys
+import threading
 import zlib
+from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import patch
 
@@ -219,3 +222,39 @@ def test_http_surface_exposes_only_health_inspection_and_tiles(
     handler.path = "/health"
     handler.do_HEAD()
     assert responses[-1] == (405, b"", "text/plain", {"Allow": "GET"})
+
+
+def test_http_server_preserves_a_tile_burst_while_accept_is_delayed(
+    atlas_fixture: tuple[object, Path, tuple[Point, ...]],
+) -> None:
+    """Pending browser connections survive a busy native accept loop."""
+    atlas, _, _ = atlas_fixture
+    server = SERVICE.RasterHTTPServer(("127.0.0.1", 0), SERVICE.handler_for(atlas))
+    with ExitStack() as resources:
+        resources.callback(server.server_close)
+        # Listen before starting serve_forever: this deterministically models
+        # the accept loop being busy while a viewport requests distinct tiles.
+        clients = [
+            resources.enter_context(socket.create_connection(server.server_address, timeout=1))
+            for _ in range(32)
+        ]
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+
+        def stop_server() -> None:
+            server.shutdown()
+            worker.join(timeout=2)
+            assert not worker.is_alive()
+
+        resources.callback(stop_server)
+        for index, client in enumerate(clients):
+            request = f"GET /tiles/2050/unprotected/5/{index % 32}/13.png HTTP/1.0\r\n\r\n"
+            client.sendall(request.encode("ascii"))
+        for client in clients:
+            response = bytearray()
+            while chunk := client.recv(4096):
+                response.extend(chunk)
+            headers, body = bytes(response).split(b"\r\n\r\n", 1)
+            assert headers.startswith(b"HTTP/1.0 200 ")
+            assert b"Cache-Control: no-store" in headers
+            assert body.startswith(b"\x89PNG\r\n\x1a\n")
