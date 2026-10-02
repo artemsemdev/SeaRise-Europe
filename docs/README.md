@@ -7,6 +7,7 @@ is at `/projections/`.
 
 | Question | Read |
 | --- | --- |
+| What is in the demo prerelease? | [v0.1.0-rc.1 contents, verification, limitations and rollback](releases/v0.1.0-rc.1.md) |
 | What are we building? | [Coastal atlas requirements](product/COASTAL_ATLAS_PRD.md), [design](product/COASTAL_ATLAS_DESIGN.md), [copy](product/COASTAL_ATLAS_CONTENT.md) |
 | What changed architecturally? | [Atlas adoption decision](architecture/adr/ADR-028-coastal-atlas-adoption.md) |
 | How do I run the atlas? | [Fixture and provisioned local quickstart](operations/coastal-atlas-development.md) |

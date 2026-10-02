@@ -4,54 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Changed
-
-- Authorized a separate, temporary private local demo performance exception
-  through the start of 16 October 2026 in Berlin. CI preserves the failed raw
-  90-point target and requires at least 50 performance in each of three cold
-  fixture audits, with 90 in every other category and healthy map rendering.
-  This does not qualify a scientific, public, or MVP release.
-
-### Security
-
-- Patched the locked URI parser and development dependencies to resolve the
-  npm advisories found while preparing the local demonstration candidate.
-
-- Updated MapLibre GL JS and its transitive URI parser to patched versions and
-  refreshed the active npm supply-chain profile and SBOM.
-
 ### Fixed
 
-- Restored the local demo’s labeled synthetic projection reference by allowing
-  verified static application caching and preserving exact release byte ranges
-  and manifest identities. Private Atlas data, basemap and error responses stay
-  `no-store`; the reference now uses the application icon without a favicon error.
-
-- Local demo shutdown now reaps the raster process even when interrupted before
-  native startup finishes, preventing orphan services during candidate checks.
-
-- The coastal Atlas gives its controls a paint opportunity before cold map
-  initialization and bounds dense-display canvas allocation, reducing measured
-  local software-render startup cost while retaining the raw performance gate.
-
-- Fresh Lighthouse audits meeting every 90-point budget now pass independently
-  of the historical Atlas waiver; expired exceptions still cannot accept slow runs.
-
-- Kept real-local flood tiles available during rapid overview, reload, and zoom
-  requests by allowing a bounded queue of pending native service connections.
-- Prevented browsers and intermediaries from retaining private, locally derived
-  coastal raster tiles by marking every tile response `no-store`.
-- Made fixture city markers easier to tap and aligned the flood-layer control
-  label with its accessible name.
-- Static Web and static-quality CI now install the declared npm version for
-  application checks, builds, and isolated Lighthouse tools.
-- Aligned contributor verification guidance with the atlas fixture and explicit
-  provisioned local workflow, keeping AR6 reference checks separately scoped.
-- Kept return-to-place controls available on mobile and tablet map views.
-- Restored boundary browser checks after the MapLibre update, including visible
-  pixel validation and useful browser failure diagnostics. Refreshed the
-  software-render QA receipt's dependency hash; rendered PNGs and scientific
-  approval evidence are unchanged.
 - Routine source validation now checks pinned removal evidence without GitHub
   credentials or network access. CI separately retains live owner verification
   for application and repository-authority changes.
@@ -62,34 +16,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Added private local demo candidates with a pinned source revision, read-only
-  application files, app/data identity checks, and explicit loopback launch.
-  CoCliCo rasters and basemap data stay outside the candidate; this workflow
-  does not qualify an MVP, scientific, or public release.
-
-- Added the accepted coastal atlas interface behind an injected data source,
-  preserving city search, point inspection, comparison, shared views, and
-  mobile controls. The software fixture is visibly identified.
-
-- Added explicit synthetic-fixture and real-local coastal atlas data sources
-  behind one abort-aware browser interface. Fixture inspection and PNG tiles
-  now sample the same bounded grid, while real-local failures remain technical
-  errors and never trigger synthetic fallback.
-- Added an explicit read-only real-local coastal atlas server adapter. Its
-  activation factory validates confined metadata, starts one verified raster
-  process, and serves loopback context, inspection, tile, and basemap requests
-  without exposing local storage identities or falling back to fixture data.
-- Added the accepted Europe atlas map component with source-provided flood
-  tiles, local fixture geography, and detailed real-local basemap styling.
-
 - Added post-cutover validation that lets retained application and CI files
   evolve while preserving completed removal approvals and preventing the
   retired runtime from returning. Publication restrictions remain unchanged.
-
-- Added a strict browser-facing coastal atlas data contract and a compact,
-  explicitly synthetic fixture covering all six year and defense combinations,
-  four coastal places, deterministic tile counts, and distinct flooded, valid
-  zero, and unknown point values without exposing local filesystem provenance.
 
 - Added an isolated issue #70 repository-removal authority profile and adapter
   that reuses the reviewed v2 lifecycle engine without rewriting the completed
@@ -1039,3 +968,47 @@ All notable changes to this project will be documented in this file.
 - Restored the macOS ARM64 trusted evidence producer with a supported,
   hash-locked CPython 3.11 runtime after GitHub retired Python 3.9 from that
   hosted runner.
+
+## [0.1.0-rc.1] - 2026-10-02
+
+Source-only Coastal Atlas demo prerelease. See the
+[release notes](docs/releases/v0.1.0-rc.1.md) for exact evidence, launch,
+identity, and rollback. Historical work outside the demo release scope remains
+tracked under Unreleased; this prerelease does not change its individual approval
+or delivery status.
+
+### Added
+
+- Added the coastal atlas with city search, point inspection, synchronized
+  2030/2050/2100 layers, modeled defense comparison, shared views, and mobile
+  controls. The public clean-clone edition is visibly illustrative; a separately
+  provisioned local edition reads the six CoCliCo SSP5-8.5 high-tide layers.
+- Added source-bound private demo candidates with read-only application files,
+  app/data identity checks, loopback launch, and documented preparation and
+  rollback. Private datasets and candidate artifacts are not release downloads.
+
+### Changed
+
+- Improved cold map startup by painting controls earlier and limiting canvas
+  allocation on dense displays while preserving native model-cell sampling.
+- Authorized a separate temporary local-demo performance exception until
+  2026-10-16 00:00 Europe/Berlin: three cold fixture audits need performance at
+  least 50, every other category at least 90, and healthy rendering. Raw failures
+  against 90 remain visible; scientific, public, and MVP qualification is unchanged.
+
+### Fixed
+
+- Kept local raster tiles available during simultaneous overview, reload, and
+  zoom requests, and reaped the native raster child when startup is interrupted.
+- Preserved private atlas and basemap responses as `no-store`, while restoring
+  verified static caching and exact manifest byte delivery for the retained
+  synthetic projection reference in the sealed local launcher.
+- Improved touch targets and return-to-place controls, restored rendered boundary
+  browser checks, and aligned contributor checks with the explicit data editions.
+- Static application and quality CI now use the declared npm version.
+
+### Security
+
+- Updated MapLibre and patched the URI parser and development dependencies to
+  resolve the npm advisories found during demo preparation; refreshed the active
+  supply-chain profile and SBOM.
