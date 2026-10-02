@@ -59,6 +59,20 @@ Raw performance still misses the unchanged 90-point target in every run.
 The expired historical waiver rejects these audits. This improvement does not
 close the public performance gate or qualify a public MVP release.
 
+## Fresh Linux CI
+
+[Static-quality run 36998471253](https://github.com/artemsemdev/SeaRise-Europe/actions/runs/36998471253)
+audited source revision `771baac16d87b5cb27adf1b66e9d841ba10574d1` with the same
+locked Chromium 151 mobile software-render profile on Linux x86-64. Raw
+performance was **54 / 56 / 54**; accessibility, best practices, and SEO were
+**100 in every run**. Production build, generic static-host validation, and the
+rendered-map preflight passed. The job rejected the expired historical waiver.
+The independent raw 90-point target remains unmet.
+
+[Raw three-run artifact](https://github.com/artemsemdev/SeaRise-Europe/actions/runs/36998471253/artifacts/11222787404)
+contains the complete reports and has the workflow's 14-day retention. This
+failed audit is evidence of remaining debt, not a passed public release gate.
+
 ## Verification
 
 The independent Lighthouse evaluator regression failed three tests before its
