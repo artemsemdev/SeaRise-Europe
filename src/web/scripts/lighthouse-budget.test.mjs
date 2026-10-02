@@ -23,6 +23,33 @@ describe("temporary local Atlas performance waiver", () => {
   it("keeps the default 90 target and does not apply a waiver when every run passes", () => {
     expect(evaluateLighthouseBudget(input([0.9, 0.95, 1]))).toMatchObject({ accepted: true, waiverApplied: false, performance90Passed: true });
   });
+  it("accepts fresh raw passes after the historical waiver expires", () => {
+    const value = { ...input([0.9, 0.95, 1]), now: Date.parse("2026-10-02T12:00:00Z") };
+    expect(evaluateLighthouseBudget(value)).toMatchObject({
+      accepted: true, waiverApplied: false, performance90Passed: true,
+      failedBudgets: [], waiver: null, warning: null,
+    });
+  });
+  it("does not require a waiver policy or waiver edition for raw passes", () => {
+    for (const edition of ["synthetic-fixture", "real-local", "public-promoted"]) {
+      expect(evaluateLighthouseBudget({ ...input([0.9, 0.95, 1]),
+        policy: undefined, edition, releaseDisposition: edition,
+      })).toMatchObject({ accepted: true, waiverApplied: false });
+    }
+  });
+  it("still rejects expired waivers when one run misses 90 despite a passing median", () => {
+    expect(() => evaluateLighthouseBudget({ ...input([0.89, 0.95, 1]),
+      now: Date.parse("2026-10-02T12:00:00Z"),
+    })).toThrow(/expired/);
+  });
+  it("checks render health and raw evidence before accepting a passing budget", () => {
+    const value = input([0.9, 0.95, 1]);
+    value.runs[0].renderErrors.push("WebGL failed");
+    expect(() => evaluateLighthouseBudget({ ...value, policy: undefined })).toThrow(/render/);
+    expect(() => evaluateLighthouseBudget({ ...input([0.9, 0.95, 1]),
+      policy: undefined, runs: input([0.9, 0.95, 1]).runs.slice(1),
+    })).toThrow(/three raw cold audits/);
+  });
   it("requires the floor in every run, even with a passing median", () => {
     expect(evaluateLighthouseBudget(input([0.499, 0.95, 1])).accepted).toBe(false);
     expect(evaluateLighthouseBudget(input([0.5, 0.5, 0.5])).waiverApplied).toBe(true);

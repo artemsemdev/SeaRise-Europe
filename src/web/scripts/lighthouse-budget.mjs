@@ -8,17 +8,6 @@ function requireCondition(condition, message) {
 }
 
 export function evaluateLighthouseBudget({ runs, policy, edition, releaseDisposition, now = Date.now() }) {
-  requireCondition(policy && Object.keys(policy).sort().join() === policyKeys.join(), "missing or malformed waiver policy");
-  requireCondition(policy.schemaVersion === 1 && policy.scope === "coastal-atlas-local-adoption"
-    && policy.edition === "synthetic-fixture" && policy.releaseDisposition === "synthetic-fixture"
-    && policy.owner === "artemsemdev" && JSON.stringify(policy.issues) === "[65,490]"
-    && policy.sourceRun === "https://github.com/artemsemdev/SeaRise-Europe/actions/runs/34493541004"
-    && JSON.stringify(policy.measuredPerformance) === "[0.54,0.53,0.55]"
-    && policy.target === target && policy.minimumPerformance === 0.5 && policy.expiresAt === expiry
-    && typeof policy.rationale === "string" && policy.rationale.trim().length >= 40,
-  "waiver policy exceeds its reviewed scope");
-  requireCondition(Number.isFinite(now) && now < Date.parse(expiry), "waiver policy expired or clock is invalid");
-  requireCondition(edition === "synthetic-fixture" && releaseDisposition === "synthetic-fixture", "waiver requires the labeled synthetic Atlas fixture, never a private or public release");
   requireCondition(Array.isArray(runs) && runs.length === 3, "three raw cold audits are required");
   for (const [index, run] of runs.entries()) {
     requireCondition(run?.run === index + 1 && run.scores
@@ -33,6 +22,23 @@ export function evaluateLighthouseBudget({ runs, policy, edition, releaseDisposi
     ...runs.flatMap(({ run, scores }) => categories.filter((id) => scores[id] < target).map((id) => `run ${run} ${id}`)),
   ];
   const performance90Passed = runs.every(({ scores }) => scores.performance >= target);
+  // Raw passes do not consume a waiver. Validate the reviewed policy only when
+  // accepting evidence would actually depend on an exception to the 90 target.
+  if (failedBudgets.length === 0) return {
+    target, medianScores, failedBudgets, performance90Passed,
+    waiverApplied: false, accepted: true, waiver: null, warning: null,
+  };
+  requireCondition(policy && Object.keys(policy).sort().join() === policyKeys.join(), "missing or malformed waiver policy");
+  requireCondition(policy.schemaVersion === 1 && policy.scope === "coastal-atlas-local-adoption"
+    && policy.edition === "synthetic-fixture" && policy.releaseDisposition === "synthetic-fixture"
+    && policy.owner === "artemsemdev" && JSON.stringify(policy.issues) === "[65,490]"
+    && policy.sourceRun === "https://github.com/artemsemdev/SeaRise-Europe/actions/runs/34493541004"
+    && JSON.stringify(policy.measuredPerformance) === "[0.54,0.53,0.55]"
+    && policy.target === target && policy.minimumPerformance === 0.5 && policy.expiresAt === expiry
+    && typeof policy.rationale === "string" && policy.rationale.trim().length >= 40,
+  "waiver policy exceeds its reviewed scope");
+  requireCondition(Number.isFinite(now) && now < Date.parse(expiry), "waiver policy expired or clock is invalid");
+  requireCondition(edition === "synthetic-fixture" && releaseDisposition === "synthetic-fixture", "waiver requires the labeled synthetic Atlas fixture, never a private or public release");
   const waiverApplied = !performance90Passed && runs.every(({ scores }) =>
     scores.performance >= policy.minimumPerformance && categories.slice(1).every((id) => scores[id] >= target));
   return {

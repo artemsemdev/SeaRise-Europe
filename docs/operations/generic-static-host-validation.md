@@ -103,9 +103,14 @@ synthetic release identity. Every cold run must score at least **50 performance*
 and **90 in each other category**. Renderer errors remain fatal. The three raw
 reports remain intact; the summary records `performance90Passed: false` and
 `waiverApplied: true`, and CI emits the actual scores, owner, floor, and expiry.
-Missing, malformed, extended, or expired policy fails closed. Fixing the debt
-requires retiring this temporary policy through review; expiry is not a silent
-return to unchecked operation.
+Missing, malformed, extended, or expired policy fails closed when an audit
+needs the performance exception. Raw audits meeting all four 90-point budgets
+in all three cold runs do not consume the waiver and therefore remain valid
+after its expiry, without a waiver policy or a synthetic edition restriction.
+Render errors and malformed or incomplete raw evidence fail before either
+acceptance path. The summary of a raw pass records `waiverApplied: false`,
+`waiver: null`, and no failed budgets. This policy remains historical evidence;
+its expiry and score floor have not been extended or changed.
 
 This is local adoption only: it qualifies neither a public MVP nor a scientific
 release and cannot apply to private-engineering or public-promoted identities.
