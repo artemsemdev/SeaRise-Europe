@@ -1,6 +1,10 @@
-# Atomic projection state
+# 17 — Atomic Projection State
 
-The framework-neutral reducer in `src/web/src/domain/projection-state.ts` owns
+> **Status:** Implemented, reviewed 2026-10-04.
+> **Scope:** Retained `/projections/` application only. Atlas uses React view
+> state, abortable providers and map generations described in [03a](03a-frontend-architecture.md).
+
+The framework-neutral [reducer](../../src/web/src/domain/projection-state.ts) owns
 the complete projection journey. React components may dispatch commands and
 render the returned state; they must not combine an accepted result with a
 pending selection.
@@ -45,3 +49,18 @@ technical search failure enters a technical state and is never translated to
 contains one release identity, one immutable selection, and one of the four
 ADR-024 outcomes. Offline, connection-required, unsupported-browser,
 integrity, and other failures are separate technical states.
+
+## Controller and validation anchors
+
+[AssessmentController](../../src/web/src/application/assessment-controller.ts)
+owns selection commands, operation cancellation, retries and reducer dispatch.
+[useAssessmentRuntime](../../src/web/src/application/use-assessment-runtime.ts)
+binds it to React; [projection-url-controller](../../src/web/src/application/projection-url-controller.ts)
+coordinates strict URL parsing/restoration separately from the reducer.
+
+The implemented phases are `booting`, `ready`, `searching`, `evaluating`,
+`updating`, `result`, `offline`, `connection-required`, `unsupported-browser`,
+`integrity-error` and `technical-error`. Technical phases do not add scientific
+result states. [`projection-state.test.ts`](../../src/web/src/domain/projection-state.test.ts)
+and [controller tests](../../src/web/src/application/assessment-controller.test.ts)
+exercise accepted-tuple consistency, release changes and stale completion.
