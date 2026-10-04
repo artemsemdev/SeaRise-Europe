@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Aligned all architecture views and their documentation indexes with the
+  implemented coastal atlas, sealed local demo and retained AR6 reference,
+  including actual contracts, privacy/cache boundaries and delivery limits.
+
 - Routine source validation now checks pinned removal evidence without GitHub
   credentials or network access. CI separately retains live owner verification
   for application and repository-authority changes.
