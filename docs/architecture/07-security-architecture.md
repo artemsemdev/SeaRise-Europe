@@ -1,220 +1,137 @@
-# Security, Privacy, and Supply-Chain Architecture
+# 07 — Security, Privacy, and Supply Chain
 
-> **Status:** Accepted target architecture
-> **Authority:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
-> **Scope:** Browser application, immutable data releases, offline build plane,
-> and Cloudflare delivery
+> **Status:** Implemented controls and explicit limits, reviewed 2026-10-04.
+> **Scope:** Atlas fixture, loopback atlas adapter, projection reference and build tooling.
 
-## Security objective
+## Trust boundaries
 
-SeaRise Europe is a public, anonymous, read-only application. The target
-runtime has no application API, account system, server-side session, database,
-or tile server. Its main security objective is therefore not API authorization;
-it is to ensure that users receive the intended application and scientifically
-validated data release without exposing their searches or coordinates.
-
-The production trust boundary is:
-
-```text
-reviewed source + pinned tools
-  -> isolated release build
-  -> validated and signed immutable artifacts
-  -> protected publication workflow
-  -> HTTPS static/object origins
-  -> browser schema and release checks
+```mermaid
+flowchart LR
+    Code[Reviewed source and dependencies] --> Build[Application build and checks]
+    Build --> Browser[Browser]
+    Browser -->|real-local only| Adapter[Loopback Node adapter]
+    Adapter --> Python[Verified raster process]
+    Adapter --> Private[Confined local files]
+    Python --> Private
+    Browser -->|projection reference| Release[Validated release artifacts]
+    Pipeline[Controlled offline build] --> Release
 ```
 
-Removing services reduces attack surface, but it does not remove browser,
-dependency, artifact-integrity, hosting-account, or build-pipeline risks.
+There is no account system, application database, upload endpoint or server-side
+user session. Real-local atlas nevertheless has a request-time service: the
+browser sends searches and coordinates to its loopback adapter. The fixture
+provider and AR6 projection search/lookup execute locally in the browser.
 
-## Assets and threat model
+## Local atlas controls
 
-| Asset | Principal threats | Required protection |
-|---|---|---|
-| Scientific release | Corruption, source substitution, wrong parameters, mixed versions | Source/artifact SHA-256, schema checks, golden tests, immutable paths, signed provenance |
-| Browser bundle | Cross-site scripting, dependency compromise, malicious third-party code | Restrictive CSP, lockfile, dependency review, no unnecessary third-party scripts |
-| Publishing account | Credential theft, unauthorized overwrite or deletion | Protected environment, least-privilege credential, MFA, append-only release policy |
-| User intent and location | Collection through logs, analytics, error reports, or URL leakage | No project-controlled request logging, no raw query/coordinate telemetry, careful URL/referrer policy |
-| Cost availability | Automated range-request abuse or unexpectedly large downloads | CDN caching, object metrics, spend alerts, bounded browser caching |
-| Offline cache | Stale or cross-release data mixture | Cache namespace by application and `dataReleaseId`, atomic activation, integrity metadata |
+The [edition plugin](../../src/web/scripts/atlas-edition.mjs) attaches the adapter
+only for `real-local`, rejects non-loopback listen hosts, and checks the built
+edition before preview. No service discovery or failure-driven fixture fallback
+exists. [Adapter activation](../../src/web/scripts/real-local-atlas.mjs):
 
-The basemap is not authoritative for assessment. Compromise or outage of the
-OpenFreeMap public instance may degrade visual context but must not alter the
-assessment state.
+- accepts only the expected six layer identities and confined regular raster files;
+- checks manifest metadata, source size, CRS and 25 m pixel size;
+- validates and hashes the prepared place index before exposing search;
+- waits for Python's raster SHA-256 verification before admitting requests;
+- returns a browser catalog without local paths, hashes or private receipts;
+- permits `GET` only on its atlas routes; confines basemap paths via `realpath`;
+- starts one Python process on `127.0.0.1` and closes it with the server.
 
-## Browser controls
+[Vite filesystem restrictions](../../src/web/vite.config.ts) deny `local-data`
+and constrain `/@fs/` access. Private inputs must not be copied into public
+assets or `dist`. Basemap path confinement is implemented; the adapter does not
+claim per-file basemap digest verification equivalent to its raster checks.
 
-The application must meet these controls:
+Atlas JSON, derived PNG and local basemap responses use `no-store`, including
+tile errors. The HTTP provider also requests `cache: "no-store"`. Python's bounded RAM tile cache is not browser
+persistence. The projection worker excludes atlas documents/data from precache
+and passes unowned requests through.
 
-- Put no API keys, publish credentials, private bucket URLs, or secrets in the
-  JavaScript bundle, source maps, manifests, or repository.
-- Encode untrusted place names as text. Never inject GeoNames fields, query
-  parameters, STAC metadata, or upstream attribution as raw HTML.
-- Validate every loaded manifest and configuration object against its versioned
-  schema before use. Reject unsupported schema versions and a release ID that
-  differs from the application-pinned ID.
-- Treat artifact URLs as data from an allowlisted origin and media type. Do not
-  follow arbitrary URLs supplied by search records or URL parameters.
-- Keep all assessment logic local. Normal operation makes zero calls to
-  `/assess`, `/geocode`, or `/config`.
-- Use Web Workers only from the application origin; do not execute code from a
-  data artifact.
-- Keep visible MapLibre/OpenFreeMap/OpenMapTiles/OpenStreetMap attribution.
-- Disable embedding unless a later product requirement explicitly permits it.
+## Private demo sealing
 
-Both checked-in static entry documents enforce this policy before any
-application script runs:
+[Demo tooling](../../scripts/demo/demo.mjs) requires explicit CLI paths and
+rejects `SEARISE_*`/`VITE_*` overrides and active app/root dotenv files. Preparation
+and serving require the exact clean commit. Candidate verification binds app
+bytes, real-local edition/build ID and six external metadata/receipt identities;
+it rejects symlinks and refuses overwrite of an existing output.
+
+[Sealed preview](../../scripts/demo/sealed-preview.mjs) disables project config
+and dotenv discovery, binds `127.0.0.1` with a strict port, and serves only the
+candidate app plus explicit adapters. The lifecycle owner reaps native children
+on interrupted startup as well as normal shutdown. Sealing is local integrity
+control, not a signature or public/scientific approval.
+
+## Browser policy
+
+All three checked-in entry documents contain the same meta CSP and
+`no-referrer`; [build inspection](../../src/web/scripts/inspect-build.mjs)
+requires their exact values:
 
 ```http
-Content-Security-Policy: default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'
+Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'
 Referrer-Policy: no-referrer
 ```
 
-The `blob:` worker allowance is required by MapLibre. The inline-style
-allowance is required by MapLibre's DOM controls; inline scripts remain
-forbidden. AJV compiles the release schema into a checked-in standalone
-validator at build time, so browser validation does not require `unsafe-eval`.
-The only cross-origin runtime access is the exact OpenFreeMap tile origin, for
-optional visual context. The current committed fixture and release artifacts
-are same-origin. A future separate canonical data origin requires a reviewed
-CSP and CORS change before use.
+The implementation permits WASM compilation but rejects JavaScript
+`unsafe-eval`/runtime validator generation. Release validation uses generated
+standalone AJV code. Style and worker allowances support the map runtime.
+OpenFreeMap is an allowed optional projection-map origin; atlas geography is
+same-origin. A new remote data origin needs a corresponding policy change.
 
-The production response headers should enforce the same policy and add the
-controls that a meta policy cannot provide:
+The source HTML's meta CSP does **not** provide `frame-ancestors`, HSTS or other
+response-only protections. Those are hosting requirements, not deployed
+controls proven by this repository. There is no checked-in OpenTofu or
+Cloudflare response-header deployment to claim otherwise.
 
-```http
-Content-Security-Policy: default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests
-Referrer-Policy: no-referrer
-X-Content-Type-Options: nosniff
-Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
-Cross-Origin-Opener-Policy: same-origin
-```
+Untrusted place names and metadata are rendered as React text. Strict atlas
+validators reject additional private fields; projection validators constrain
+schema, disposition, release identity, role, path and origin before use.
 
-`frame-ancestors` must remain a deployment response-header requirement because
-browsers do not enforce it from a meta CSP. The exact OpenFreeMap origin is
-taken from the pinned style and tested before deployment. If cross-origin
-isolation is later enabled, verify that all map and data origins provide
-compatible resource policies first. The `'unsafe-inline'` style exception is
-accepted only while required by MapLibre; CI records and tests any CSP
-relaxation.
+## Privacy by edition
 
-## Object delivery and CORS
-
-R2 is served through a custom HTTPS domain. Bucket access and CORS are narrow:
-
-- public users have `GET` and `HEAD` access only;
-- `Access-Control-Allow-Origin` names the production and approved preview
-  origins, not `*`, unless an explicit open-data distribution decision changes
-  that rule;
-- allow the `Range` and `If-Match` request headers;
-- expose `Accept-Ranges`, `Content-Length`, `Content-Range`, and `ETag`;
-- do not expose bucket administration endpoints or R2 credentials;
-- apply `nosniff` and correct media types to every object.
-
-Artifacts are release-versioned and never overwritten. A mutable release
-pointer has a short TTL and is not the scientific identity used in a session;
-the application pins one immutable `dataReleaseId`.
-
-## Build and publication security
-
-Only reviewed CI publishes production releases. A release job must:
-
-1. Fetch sources from recorded authoritative URLs and verify expected size and
-   SHA-256 before processing.
-2. Use pinned action revisions, dependency lockfiles, tool/container versions,
-   and a clean checkout.
-3. Run contract, scientific, licence, malware/dependency, and artifact checks.
-4. Generate SLSA-compatible provenance that records sources, code revision,
-   tool versions, parameters, and subjects.
-5. Create a keyless Cosign/Sigstore signature for the manifest/provenance
-   bundle and retain the transparency-log evidence.
-6. Upload through a credential limited to the intended bucket/prefix. The job
-   cannot change DNS, account ownership, or unrelated releases.
-7. Verify the published checksums and byte-range responses before activating
-   the application/release pair.
-
-Source and generated-data caches are untrusted build inputs. They are ignored
-by Git, checked before use, and never published merely because a file is present
-locally. Pull requests do not receive production publish credentials.
-
-Dependency controls include automated update PRs, dependency review, secret
-scanning, licence checks, and vulnerability scanning for npm, Python, native
-geospatial tools, GitHub Actions, and OpenTofu providers. A critical finding in
-a reachable runtime dependency blocks release; documented exceptions have an
-owner and expiry date.
-
-## Privacy policy
-
-Searches and selected coordinates stay in the browser. SeaRise Europe does not
-send them to a project-controlled backend because no such backend exists.
-
-If analytics or client error reporting is introduced later, it must receive a
-separate privacy review and satisfy all of these constraints:
-
-- opt-in or aggregate-only collection;
-- no search text, coordinates, full page URLs, IP-derived precise location,
-  local cache contents, or stable cross-site identifier;
-- URL query/fragment scrubbing before events and errors leave the browser;
-- documented retention, processor, purpose, and deletion policy;
-- a user-visible way to disable optional collection.
-
-Cloudflare and the basemap provider still process ordinary network metadata.
-The privacy notice must distinguish provider access logs from application
-analytics and link to the current providers' policies.
-
-## Runtime integrity and offline caches
-
-The browser verifies schema version, `dataReleaseId`, expected scenario/horizon
-coverage, and artifact metadata before assessment. HTTPS plus the pinned release
-is the normal runtime trust boundary; full signature and checksum verification
-runs in CI and is exposed as evidence on `/about/architecture`.
-
-Service-worker caches are versioned. The built worker contains exactly one
-immutable bootstrap authority with the canonical path, media type, byte size,
-and SHA-256 for every shell resource. Installation verifies both fetched bytes
-and an existing exact-name candidate cache before it can complete. A mismatch
-removes only that exact failed cache; caches for unrelated or differently
-versioned application/release pairs remain untouched. Controlled reads verify
-cached bytes again, and a missing entry is restored only after its network
-response passes the same authority;
-any mismatch quarantines the exact shell cache without touching unrelated
-caches. Activation must either expose a complete new shell/manifest
-pair or retain the previous pair. Data ranges from two releases must never
-share a cache namespace. On a mismatch, malformed response, or missing uncached
-range, the UI returns an honest availability state and does not infer a
-scientific result.
-
-## Incident response and recovery
-
-| Event | Response |
+| Flow | Actual handling |
 |---|---|
-| Bad application deploy | Redeploy the last known-good static build pinned to its release |
-| Bad scientific release | Remove it from mutable discovery, deploy the previous app/release pair, retain artifacts for investigation unless legally unsafe |
-| Compromised publish credential | Revoke it, freeze publication, audit object/DNS changes, reissue least-privilege credentials |
-| Dependency or provenance compromise | Block releases, identify affected releases from manifests, publish a signed advisory and replacement |
-| Unexpected privacy telemetry | Disable collection, preserve minimal audit evidence, follow the documented deletion/notification process |
-| Cost/traffic abuse | Enable stricter caching/rate controls at the edge without adding business logic, then review request evidence in aggregate |
+| Atlas fixture search/inspection | Provider computes in browser memory |
+| Real-local atlas search/inspection | Query text and coordinates appear in loopback GET requests |
+| Projection search | Query text is Worker/browser memory only; no geocoding request |
+| Shared/current selection | Both apps write view or selected-coordinate state to URL query parameters |
+| Python request logging | Handler suppresses default per-request access logging |
+| Analytics | No application analytics/error-reporting backend is installed |
 
-Immutable releases make rollback recoverable and auditable. Deleting a
-published release is an exceptional incident action, not the normal rollback
-mechanism.
+URLs can appear in browser history and in document requests to a host on
+navigation/reload. `no-referrer` limits referrer transmission; it is not a
+promise that selected coordinates can never reach a static host. Do not describe
+all editions as having zero query/coordinate transport or guaranteed absence
+of provider logs. A future telemetry integration needs explicit data minimization.
 
-## Verification gates
+## Projection integrity and supply chain
 
-CI and production smoke tests must prove:
+[ManifestRepository](../../src/web/src/data/manifest-repository.ts) enforces the
+pinned browser v2 manifest or explicit private binding. Complete resources are
+verified before Cache Storage admission; COG chunks require release-authorized
+integrity metadata. Projection PMTiles is visual-only and network-only with
+`no-store`, as defined by [ADR-026](adr/ADR-026-authoritative-browser-range-persistence.md).
+Private-engineering sessions cannot enter production retention authority.
 
-- no secrets in built assets and no unexpected external origins;
-- the CSP and security headers are present and compatible with supported flows;
-- runtime network assertions show no application API calls;
-- manifests and STAC are schema-valid and all artifact hashes/sizes match;
-- provenance and Cosign verification succeed;
-- R2 CORS permits only intended browser access and byte ranges work;
-- offline activation never mixes releases;
-- dependency, secret, licence, and infrastructure scans pass;
-- a rollback drill can restore the previous application/release pair.
+The worker verifies its sealed shell at install and on controlled reads.
+Update/retention code requires exact app/release identities, client authority
+and safe cleanup; it does not force activation with `skipWaiting`/`clients.claim`.
+See [04](04-runtime-sequences.md).
 
-## Deferred decisions
+Implemented build controls include pinned dependencies/actions, the v2
+supply-chain profile, SBOM/evidence validators, output isolation, private-candidate
+isolation, critical production npm audit and CodeQL workflows. Protected signing
+and readback tools exist separately from ordinary app builds. A synthetic
+fixture is not a cryptographically approved scientific release.
 
-Authentication, user-generated content, exact-address geocoding, application
-APIs, and detailed client telemetry are outside the baseline. Each would add a
-new trust boundary and requires its own ADR before implementation.
+[Post-cutover validation](../../scripts/repository/validate_post_cutover.py)
+protects historical removal authority. Local `--evidence-only` validation and
+CI `--verify-owner-comment` have deliberately different evidence scopes.
+
+## Operational limits
+
+Public atlas hosting, release qualification, source redistribution and
+production response headers remain unresolved delivery work. Local adapter
+controls do not authorize exposing its listener publicly. Recovery uses reviewed
+source/builds and exact data identities; changing a document or passing a fixture
+test does not authorize publication or alteration of historical evidence.
