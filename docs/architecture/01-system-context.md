@@ -1,155 +1,97 @@
 # 01 — System Context
 
-> **Status:** Accepted static-first architecture
-> **Decision:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md)
-> **Implementation:** Static browser runtime; removed service-based code is recoverable through Git history only
+> **Status:** Implemented repository architecture, reviewed 2026-10-04.
+> **Scope:** Coastal atlas and retained AR6 projection reference.
+> **Decision context:** [ADR-028](adr/ADR-028-coastal-atlas-adoption.md),
+> [ADR-024](adr/ADR-024-ar6-regional-projection-contract.md).
 
-## Purpose
+## Product boundary
 
-SeaRise Europe is a public, read-only explorer that answers:
+SeaRise Europe has two browser applications in one React/TypeScript/Vite
+workspace. Their entry points, data sources, and scientific meanings differ.
 
-> What regional relative sea-level change does the selected IPCC AR6 scenario
-> project at the nearest native source-grid location for this absolute horizon?
+| Surface | Implemented behavior | Data boundary |
+|---|---|---|
+| `/`, normal build | Coastal atlas with city search, point inspection, year/defense controls, comparison and shared views | Explicitly illustrative, browser-local fixture |
+| `/`, `real-local` mode | The same atlas UI with CoCliCo depth cells and prepared European geography | Read-only loopback adapter and Python raster process; requires provisioned files |
+| Sealed private demo | Source/app/data-bound real-local candidate served on loopback | Read-only candidate app; provisioned rasters remain external |
+| `/projections/` | Retained AR6 regional relative sea-level explorer | Browser search and exact lookup against a pinned immutable release |
+| `/about/architecture/` | AR6 reference architecture/status page | Build identity and release disposition; not a live atlas operations dashboard |
 
-The product makes precomputed scientific results understandable and
-inspectable. It does not determine flooding, inundation, terrain exposure,
-flood probability, property risk, safety, or adaptation measures.
+The atlas contract fixes SSP5-8.5 (`ssp585`), spring high tide, years
+2030/2050/2100, and protected/unprotected defenses. Point values distinguish
+positive modeled depth, valid zero, and unknown. The normal fixture does not
+establish real-world flood coverage or scientific validity.
 
-The target system is a static geospatial data product. Scientific processing
-occurs before publication; a browser searches places, checks scope, reads the
-selected native-grid projection values, and renders them without an application
-API.
+The projection reference fixes three scenarios and three horizons. It reports
+relative AR6 change and its likely range, with four projection result states;
+it does not calculate flood depth. These contracts are not interchangeable.
+See [13 — Domain Model](13-domain-model.md).
 
-## People and systems
+## People and dependencies
 
-| Actor or system | Relationship to SeaRise Europe |
+| Actor or dependency | Relationship |
 |---|---|
-| Public visitor | Searches for a settlement, selects a scenario and horizon, explores the map, and reads methodology and limitations. No account is required. |
-| Portfolio reviewer | Inspects the architecture page, release provenance, fitness results, open formats, cost model, and source code. |
-| Maintainer | Pins source snapshots, runs and reviews the offline build, publishes an immutable release, and can roll back to an earlier app/release pair. |
-| IPCC, GeoNames, Natural Earth | Versioned upstream sources used only by the offline build plane. They are not request-time dependencies. |
-| Static host and object storage/CDN | Deliver the application shell, metadata, search indexes, and byte ranges from large geospatial artifacts. |
-| OpenFreeMap | Supplies non-authoritative visual context. Search and assessment remain functional if it is unavailable. |
-| GitHub Actions | Validates and publishes reviewed releases; it is outside the user request path. |
-
-## System boundary
-
-Inside the SeaRise Europe product boundary:
-
-- a static React application and its service worker;
-- browser-side search, scope validation, and assessment logic;
-- immutable, versioned release artifacts and their public contracts;
-- an offline data pipeline, scientific QA, provenance, and publication steps;
-- infrastructure-as-code for static hosting, object storage, caching, CORS,
-  and DNS;
-- the public architecture and methodology presentation.
-
-Outside the product boundary:
-
-- upstream source production and scientific stewardship;
-- the OpenFreeMap public service;
-- browser implementation and device storage quotas;
-- Cloudflare's platform and the public Internet;
-- address-level geocoding, user accounts, saved projects, payments, and
-  collaboration features.
-
-## Context diagram
+| Visitor/reviewer | Explores the fixture or projection reference without an account; can inspect source and status |
+| Local operator | Provisions the real-local atlas workspace and explicitly starts its adapter |
+| Maintainer | Changes source, contracts and fixtures; runs CI and controlled release tooling |
+| CoCliCo rasters and prepared place/basemap files | Local atlas inputs; not fetched from upstream during ordinary interaction |
+| IPCC AR6, GeoNames, Natural Earth | Retained pipeline source inputs, pinned before processing |
+| Static HTTP host | Delivers built documents, app assets and the committed projection fixture |
+| OpenFreeMap | Optional visual context for the projection map; atlas styles use fixture geography or local basemap assets |
+| GitHub Actions | Runs checks and protected evidence workflows outside the browser request path |
 
 ```mermaid
 flowchart LR
-    Visitor[Public visitor]
-    Reviewer[Portfolio reviewer]
-    Maintainer[Maintainer]
-
-    subgraph SRE[SeaRise Europe]
-        Browser[Static browser application]
-        Release[Immutable data release]
-        Pipeline[Offline build and QA]
-        Evidence[Architecture, methodology and provenance]
-    end
-
-    Sources[IPCC / GeoNames / Natural Earth]
-    Host[Static host + object storage/CDN]
-    Basemap[OpenFreeMap]
-    CI[GitHub Actions]
-
-    Visitor --> Browser
-    Reviewer --> Browser
-    Reviewer --> Evidence
-    Browser --> Release
-    Browser -. visual context .-> Basemap
-    Host --> Browser
-    Host --> Release
-    Sources --> Pipeline
-    Maintainer --> Pipeline
-    Pipeline --> Release
-    Pipeline --> Evidence
-    CI --> Pipeline
-    CI --> Host
+    User[Visitor] --> Atlas[Coastal atlas]
+    Atlas --> Fixture[Authored browser fixture]
+    Atlas --> Local[Explicit loopback adapter]
+    Local --> Places[Verified local place index]
+    Local --> Raster[Python raster service]
+    Local --> Basemap[Prepared local basemap]
+    Raster --> Files[Local CoCliCo rasters]
+    User --> Projection[AR6 projection reference]
+    Pipeline[Offline AR6 build] --> Release[Immutable release artifacts]
+    Projection --> Release
+    Projection -. visual context .-> OpenFreeMap
+    Host[Static host] --> Atlas
+    Host --> Projection
 ```
 
-## Request-time and release-time boundaries
+The edition is chosen at development/build startup, not by a query parameter,
+service discovery, or saved browser state. Failure in `real-local` never
+selects the synthetic provider.
 
-The architecture separates two fundamentally different workloads.
+## Request and build boundaries
 
-### Request time
+Atlas fixture reads and tile generation run in the browser. Real-local search
+queries and inspection coordinates are sent to the loopback adapter; raster
+inspection and PNG rendering happen in Python. This is an implemented local
+service boundary, not a public deployment design.
 
-The browser performs bounded, deterministic operations:
+Projection search runs in a browser Worker. Geometry classification and exact
+COG lookup run locally over release assets; its scientific values never come
+from PMTiles display colors. Its service worker supports only its explicitly
+verified offline resources. The atlas registers no service worker and has no
+promised offline reload capability.
 
-1. Load the static shell and its pinned release manifest.
-2. Search a prebuilt settlement index in a Web Worker.
-3. Test a selected coordinate against versioned support geometries.
-4. Read only the required byte ranges from the selected analysis artifact.
-5. Map the projection lookup to one of four result states.
-6. Render the synchronized map, explanation, methodology version, and source
-   attribution.
+The repository contains no active Next.js server, ASP.NET API, PostGIS runtime,
+or TiTiler service. Their removal is complete under ADR-025/027. The atlas
+adapter is the separate development boundary allowed by ADR-028.
 
-There is no request-time backend, database, tile server, geocoder, or source
-data processing.
+## Delivery status and implementation evidence
 
-### Release time
+A successful build proves engineering behavior, not public data publication.
+Cloudflare Static Assets/R2 remain a reference hosting direction; no checked-in
+OpenTofu deployment or public atlas data distribution is implemented. Private
+local inputs and Candidate-v7 are outside the built application inventory.
 
-The offline pipeline performs the expensive and stateful work:
+Source anchors:
 
-1. Fetch and checksum pinned source snapshots.
-2. Normalize, join, classify, and package data.
-3. Produce all nine scenario/horizon combinations and settlement indexes.
-4. Validate scientific control points, schemas, artifact integrity, licences,
-   and performance budgets.
-5. Generate STAC metadata, SLSA-compatible provenance, and a signed manifest.
-6. Publish a new immutable release only after every gate passes.
-
-## Product invariants at the boundary
-
-- Scenario IDs are `ssp1-26`, `ssp2-45`, and `ssp5-85`.
-- Horizons are `2030`, `2050`, and `2100`.
-- Defaults are `ssp2-45` and `2050`.
-- Every assessment returns exactly one of: `ProjectionAvailable`,
-  `DataUnavailable`, `OutOfScope`, or `UnsupportedGeography`.
-- Every `ProjectionAvailable` result discloses the AR6 median, likely range,
-  baseline, source-grid identity and distance, and native 1° resolution.
-- `OutOfScope` and `UnsupportedGeography` are domain results, not failures.
-- Every visible result is tied to a methodology version and immutable data
-  release.
-- Searches and selected coordinates are not sent to a project-controlled
-  server.
-
-## Dependency posture
-
-An upstream source outage can delay a new release but cannot break an already
-published one. A basemap outage removes visual context but not the authoritative
-assessment. A static-host or object-storage outage affects delivery and is
-detected by synthetic checks. Previously cached core resources remain usable
-within the documented offline scope.
-
-Every scientific and browser artifact uses portable formats: JSON, PMTiles,
-COG, GeoParquet, STAC, and Sigstore bundles. Cloudflare is the reference host,
-not part of the product's scientific contract.
-
-## Repository baseline
-
-The repository implements the accepted static-only boundary. The browser reads
-immutable release assets directly, while deterministic source processing stays
-in the offline build plane. Superseded request-time services and their local
-development scaffolding have been removed under ADR-025; Git history is the
-source rollback. Live provider provisioning remains a separate operation.
+- [Vite entries and plugins](../../src/web/vite.config.ts)
+- [Atlas entry and edition selection](../../src/web/src/atlas/main.tsx)
+- [Atlas adapter activation](../../src/web/scripts/real-local-atlas.mjs)
+- [Private demo launcher](../../scripts/demo/demo.mjs)
+- [Projection entry](../../src/web/src/main.tsx)
+- [Architecture page](../../src/web/src/routes/ArchitecturePage.tsx)
+- [Post-cutover validator](../../scripts/repository/validate_post_cutover.py)
