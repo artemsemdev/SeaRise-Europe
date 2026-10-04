@@ -1,431 +1,150 @@
 # 03a — Browser Application Architecture
 
-> **Status:** Accepted target architecture
-> **Decisions:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md) and [ADR-026 — Authoritative Browser Range Persistence](adr/ADR-026-authoritative-browser-range-persistence.md)
-> **Role:** Primary runtime component view
-> **Experience authority:** [SeaRise Flight](../product/Mock/SeaRise-Flight.html)
-> and its [design contract](../product/Mock/DESIGN.md)
+> **Status:** Implemented frontend, reviewed 2026-10-04.
+> **Decision context:** [ADR-028](adr/ADR-028-coastal-atlas-adoption.md) for atlas;
+> ADR-024/026 for the retained projection application.
 
-## Goals and constraints
+## Entries and source boundaries
 
-The browser application provides the complete product experience without a
-request-time application service. It must:
+[Vite configuration](../../src/web/vite.config.ts) emits three documents. These
+are client-rendered React entries, not server-rendered pages or hydration of
+pre-rendered results. The source HTML contains an empty `root` and metadata.
 
-- search European settlements locally and privately;
-- assess a coordinate from immutable, pinned data artifacts;
-- preserve exactly four scientifically meaningful result states;
-- keep location, scenario, horizon, layer, legend, methodology, and release in
-  sync;
-- remain useful after the core resources have been cached;
-- meet WCAG 2.2 AA and the ADR-021 performance fitness functions;
-- expose enough evidence to make the architecture and data pipeline reviewable
-  as a portfolio project.
-
-The target stack is React 19, TypeScript, Vite 8, MapLibre GL JS, PMTiles,
-Web Workers, and standard browser caching APIs. React state is local by
-default. Zustand is allowed only when a state genuinely spans independent
-component subtrees. Immutable files are not a reason to add a server-state
-framework.
-
-## Routes and build output
-
-| Route | Purpose | Rendering |
+| Route | Entry | Responsibility |
 |---|---|---|
-| `/` | Search, map exploration, controls, assessment, and result explanation | Static shell hydrated into an interactive client application |
-| `/about/architecture` | Current release, sources, method, limitations, performance evidence, cost, STAC, and signed provenance | Generated from the pinned release manifest at build time, with links to immutable evidence |
+| `/` | [`atlas/main.tsx`](../../src/web/src/atlas/main.tsx) | Chooses edition and injects a data source into `AtlasApp` |
+| `/projections/` | [`main.tsx`](../../src/web/src/main.tsx) | Boots `App`, release context and projection service-worker registration |
+| `/about/architecture/` | Same projection entry | Lazy `ArchitecturePage`, selected by pathname in `App` |
 
-Vite emits static HTML, CSS, JavaScript, worker, and service-worker assets.
-There are no server components, server actions, SSR runtime, or API routes.
-Both routes must provide meaningful document titles, landmarks, and fallback
-content before JavaScript initialization.
+The actual source layout under `src/web/src` is:
 
-## UI composition contract
+```text
+atlas/           Atlas UI, model, contracts, data providers and map adapter
+application/     Projection controller, React hooks, URL/runtime coordination
+domain/          Projection selection, reducer, scientific lookup and errors
+data/            Manifest, geography, COG, integrity and methodology adapters
+search/          Projection codepoint-trie runtime, Worker protocol and client
+offline/         Projection resource authority, storage, update and retention
+components/      Projection UI and map components
+routes/          Projection ArchitecturePage
+contracts/       Generated release validators and TypeScript contracts
+```
 
-The runtime implements the active canonical Flight visual and interaction
-reference. Component boundaries, lazy loading, and scientific anti-corruption
-layers must preserve its editorial map-first composition, information
-hierarchy, dominant search entry, flight/arrival interaction character,
-layered result panel, visible controls, progressive evidence disclosure, and
-responsive behavior. Technical architecture is not permission to replace the
-experience with a generic dashboard or disconnected map and form.
+React state is local. The current dependencies include neither Zustand nor a
+server-state query framework. [Boundary checks](../../src/web/scripts/check-boundaries.mjs)
+protect the implemented dependency direction.
 
-ADR-024 replaces only invalid scientific semantics. The mock's two binary
-exposure cards become one `ProjectionAvailable` presentation; unavailable and
-out-of-scope states map to `DataUnavailable` and `OutOfScope`; and the missing
-`UnsupportedGeography` state is added. Terrain comparison, modeled-water/flood
-meaning, binary exposure, and property claims are never implemented. The
-surrounding visual structure and interaction character remain authoritative.
-
-## Logical component structure
+## Atlas composition
 
 ```mermaid
 flowchart TD
-    Shell[AppShell]
-    Search[SettlementSearch]
-    Results[ResultPanel]
-    Controls[Scenario + horizon controls]
-    Map[MapSurface]
-    Method[MethodologyPanel]
-    Offline[OfflineStatus]
-    About[ArchitecturePage]
-
-    Manifest[ManifestRepository]
-    SearchClient[SearchWorkerClient]
-    Assessor[AssessmentEngine]
-    Geometry[GeographyClassifier]
-    Raster[AnalysisArtifactReader]
-    MapData[MapLayerResolver]
-    Cache[ReleaseCache]
-
-    Shell --> Search
-    Shell --> Results
-    Shell --> Controls
-    Shell --> Map
-    Shell --> Method
-    Shell --> Offline
-    Shell --> About
-    Search --> SearchClient
-    Shell --> Manifest
-    Shell --> Assessor
-    Assessor --> Geometry
-    Assessor --> Raster
-    Map --> MapData
-    Manifest --> Geometry
-    Manifest --> Raster
-    Manifest --> MapData
-    Cache --- Manifest
-    Cache --- SearchClient
-    Cache --- Raster
-    Cache --- MapData
+    Entry[atlas/main.tsx] --> Factory[createAtlasDataSource]
+    Entry --> App[AtlasApp]
+    Factory --> Provider[One explicit provider]
+    App --> Search[CitySearch]
+    App --> Point[PointInspection]
+    App --> Map[Lazy EuropeMap]
+    App --> About[AboutDialog]
+    App --> Model[model.ts URL selection]
+    App & Search & Point & Map --> Provider
+    Map --> Runtime[MapLibre + bundled worker]
 ```
 
-UI components display state and emit user intent. Repositories and domain
-modules own artifact access and rules. A React component must not convert a map
-colour, perform an ad-hoc point-in-polygon test, or construct a release URL.
+`AtlasApp` owns selection, catalog loading/retry, selected city, timeline,
+comparison, map status, detail-panel visibility and sharing. UI components
+receive `AtlasDataSource`; they do not import the disk manifest or issue raw
+HTTP calls. `create-data-source.ts` chooses fixture unless explicitly given
+`real-local`; the entry makes that choice from Vite mode.
 
-## Suggested source boundaries
+The interface has `getCatalog`, `search`, `getPlace`, `inspect` and `getTile`.
+All accept an optional cancellation signal. The HTTP provider validates response
+shape, content type, edition, matching inspection coordinates/defenses, PNG
+signature and measured pixel counts. Its failure vocabulary is
+`invalid-request`, `unavailable`, `invalid-response`; cancellation preserves
+`AbortError`. There is no automatic fallback between editions.
 
-```text
-src/
-├── app/
-│   ├── AppShell.tsx
-│   ├── routes.tsx
-│   └── state.ts
-├── components/
-│   ├── search/
-│   ├── map/
-│   ├── results/
-│   ├── methodology/
-│   └── shared/
-├── domain/
-│   ├── assessment.ts
-│   ├── geography.ts
-│   ├── result-state.ts
-│   └── types.ts
-├── data/
-│   ├── manifest-repository.ts
-│   ├── analysis-artifact-reader.ts
-│   ├── map-layer-resolver.ts
-│   └── schemas/
-├── search/
-│   ├── search-worker.ts
-│   ├── search-worker-client.ts
-│   ├── normalize.ts
-│   └── ranking.ts
-├── offline/
-│   ├── release-cache.ts
-│   └── service-worker.ts
-├── pages/
-│   └── ArchitecturePage.tsx
-└── content/
-    └── en.ts
-```
+`CitySearch` debounces input and aborts obsolete searches. `PointInspection`
+keys results by point, defenses and provider, aborts obsolete work and exposes
+retry. It requests all three years together; selecting another displayed year
+does not change the scientific meaning of the returned values.
 
-This is a dependency boundary, not a mandatory directory-by-directory
-refactor. `components` may depend on `domain`, `data`, `search`, and `offline`;
-domain code must not depend on React, MapLibre, or the network.
+## Atlas view state and map
 
-## Bootstrap and manifest contract
+[`model.ts`](../../src/web/src/atlas/model.ts) reads and writes `year`,
+`defenses`, `flooding`, `city`, `compare`, `view` and `point`. Defaults are 2050,
+unprotected, overlay visible and comparison off. `AtlasApp` uses
+`history.replaceState` and restores on `popstate`; selection URLs are updated
+during normal use, not only on Share. Invalid values use the model's defaults
+or are omitted. Edition is never selected by the URL.
 
-The application build pins a `dataReleaseId`. Bootstrap performs:
+Comparison toggles between 2030 and 2100 at the same view; it is not a second
+scientific scenario or a split-screen calculation. Timeline playback steps
+through the three fixed years. It does not interpolate between them.
 
-1. Render the shell and default controls (`ssp2-45`, `2050`).
-2. Fetch the pinned `manifest.json` and validate its release identity and
-   schema before enabling assessment.
-3. Resolve scenarios, horizons, methodology, support geometry, attribution,
-   and artifact URLs only through the manifest.
-4. Initialize MapLibre in a lazy chunk.
-5. Schedule search-worker initialization on search focus or browser idle.
-6. Register the service worker after the shell is interactive.
+`EuropeMap` installs a per-instance protocol which asks the injected provider
+for PNG bytes and validity/flood counts. Generation checks prevent stale tile
+completions from changing the current layer status. Fixture geography is local
+GeoJSON; real-local geography uses prepared Protomaps PMTiles, glyphs and
+sprites. Flood values are independent of those geographic features.
 
-A malformed manifest, missing required scenario/horizon combination, or release
-ID mismatch is a technical startup error. The application must retain the
-shell, explain the problem, and provide a retry; it must not substitute an
-artifact from another release.
+Map mount waits for two animation frames to give controls a paint opportunity;
+canvas pixel ratio is capped at 1.5 on dense displays. The map supports zoom to 16; flood tile zoom is capped at 13. Point inspection
+uses source values, never rendered color. Larger map scale does not improve
+the 25 m source-cell resolution. Map chunk failures have a retry boundary.
 
-The implemented `ManifestRepository` compiles the release v1 JSON Schemas,
-then applies identity, disposition, canonical 3 × 3 matrix, reference-role,
-media-type, path, and origin checks. It returns a deeply immutable
-`ReleaseContext`; feature code receives resolved artifact URLs and never
-constructs provider/storage paths. Generated TypeScript contracts are checked
-against the schemas on every static-target lint run. Fetch, range, decode,
-integrity, unsupported-browser, abort, schema, and identity failures form a
-separate exhaustive technical-error vocabulary.
+## Retained projection frontend
 
-## Search subsystem
+[`App.tsx`](../../src/web/src/App.tsx) retains Flight's layout and interactions.
+It obtains an immutable `ReleaseContext` through `useReleaseContext` and binds
+`useAssessmentRuntime` plus `useProjectionUrl`. `AssessmentController` owns
+search/assessment operations and the framework-neutral reducer owns accepted
+projection state. See [17](17-atomic-projection-state.md).
 
-`SettlementSearch` communicates with a dedicated Web Worker through a small
-typed protocol:
+`ManifestRepository` validates browser manifest **v2** with generated standalone
+AJV code. Private-engineering mode uses its separate private-binding validator.
+It checks the pinned ID, disposition, exact 3 × 3 matrix, artifact roles, paths,
+origins and scientific identities. This is not a direct v1-manifest consumer.
 
-```typescript
-type SearchWorkerRequest =
-  | { kind: 'initialize'; token: number; authority: SearchShardAuthority }
-  | { kind: 'load-shard'; token: number; authority: SearchShardAuthority }
-  | { kind: 'query'; token: number; query: string }
-  | { kind: 'terminate'; token: number };
+Projection search loads byte-verified core/coastal shards in a Worker with a
+lazy Brotli decoder. The implementation is a codepoint trie, not MiniSearch.
+The exact message shapes live in
+[`worker-protocol.ts`](../../src/web/src/search/worker-protocol.ts); correlation
+uses release, client generation, query identity and monotonic tokens. Raw text
+stays in browser memory. Results do not initiate assessment until selected.
 
-type SearchWorkerResponse =
-  | { kind: 'ready'; token: number; shardId: SearchShardId; durationMilliseconds: number }
-  | { kind: 'results'; token: number; results: RankedSearchResult[]; readyShards: SearchShardId[] }
-  | { kind: 'error'; token: number; error: TechnicalError };
-```
+The assessment path validates selection, classifies support/coastal geometry,
+then reads the nearest AR6 location's exact quantiles from a COG. Technical
+errors remain separate from the four domain outcomes. `MapExplorer` and its
+MapLibre/PMTiles runtime load separately; PMTiles remains visual-only.
 
-The core shard becomes searchable first. Coastal results merge deterministically
-when the second shard is ready. The worker applies the versioned normalization
-and ranking rules; the UI never re-sorts results by a different rule.
+Projection URL parsing is strict: invalid scenario, horizon, coordinates or
+release mismatch produces a technical error, not a silently substituted result.
+The accepted tuple drives result, map and shared selection.
 
-The index is loaded on focus or idle, not on the critical rendering path.
-Queries are debounced only to reduce unnecessary worker messages, not to make a
-network call. The client applies a monotonically increasing token and ignores a
-response for any earlier query. Country and first-level administration remain
-visible for duplicate names, and all candidates are keyboard navigable.
+## Offline boundary
 
-The implemented static target verifies each shard's exact release-authorized
-transport bytes before decoding. Identity JSON is parsed directly; Brotli
-objects use a pinned decoder loaded lazily inside the Worker. Raw query text is
-memory-only and never enters URLs, request bodies, storage, caches, logs, or
-analytics. See the [static settlement search runbook](../operations/static-settlement-search.md).
+Only the projection entry registers `/service-worker.js` after interactivity.
+The worker's scope is `/`, but its sealed shell targets
+`/projections/index.html` and the projection dependency graph. Atlas documents,
+`/atlas-data` and architecture documents are excluded from precache; unrelated
+requests pass through. No atlas offline guarantee follows from that root scope.
 
-## Assessment engine
+Projection Cache Storage admits verified complete resources; the bounded range
+store admits only integrity-authorized COG chunks. Visual PMTiles is
+network-only with `no-store`. The active and immediately previous complete
+pairs survive retention; updates use natural activation after closing existing
+tabs. Detailed flows are in [04](04-runtime-sequences.md).
 
-The assessment engine exposes one typed operation:
+## Implemented evidence and limits
 
-```typescript
-assess(query: AssessmentQuery, context: ReleaseContext, signal: AbortSignal)
-  => Promise<AssessmentResult>
-```
+`ArchitecturePage` renders build ID, release ID, status, manifest path and a
+static explanation. It is not generated from release evidence at build time
+and does not currently display a full cost, STAC, signature or performance
+report. Methodology is a separate release-backed projection dialog; atlas
+methods and edition disclosure are in `AboutDialog`.
 
-It evaluates in a fixed order:
-
-1. Validate latitude, longitude, scenario, horizon, and release identity.
-2. Return `UnsupportedGeography` when the coordinate lies outside the Europe
-   support geometry.
-3. Return `OutOfScope` when it lies inside Europe but outside the coastal
-   analysis zone.
-4. Resolve the exact scenario/horizon artifact from the manifest.
-5. Select the nearest native AR6 grid location by unrounded Haversine distance
-   and lowest-ID tie-break.
-6. Return `DataUnavailable` when that location is farther than 100 km or any
-   required quantile is source nodata.
-7. Otherwise return `ProjectionAvailable` with q0.167, q0.5, q0.833, source
-   identity and distance, baseline, scenario, horizon, and native resolution.
-
-Network, parse, integrity, and cache-miss failures are technical errors, not
-scientific result states. If a required range is unavailable, the engine does
-not guess or convert the failure to `DataUnavailable`.
-
-The visual overlay is resolved independently from the same release/scenario/
-horizon key. It may use PMTiles, but the scientific value comes from the exact
-analysis artifact; PMTiles is visual-only.
-
-## Application state
-
-Use a discriminated union so impossible UI combinations cannot be represented:
-
-```typescript
-type AppState =
-  | { phase: 'booting' }
-  | { phase: 'ready'; selection: Selection }
-  | { phase: 'searching'; selection: Selection; query: string }
-  | { phase: 'assessing'; selection: Selection; previous?: AssessmentResult }
-  | { phase: 'result'; selection: Selection; result: AssessmentResult }
-  | { phase: 'technical-error'; selection?: Selection; error: UserSafeError };
-```
-
-`AssessmentResult.resultState` carries all four domain outcomes. Do not create
-separate error phases for `OutOfScope`, `UnsupportedGeography`, or
-`DataUnavailable`.
-
-Only one immutable `Selection` is current:
-
-```typescript
-type Selection = {
-  location: SelectedLocation;
-  scenarioId: 'ssp1-26' | 'ssp2-45' | 'ssp5-85';
-  horizon: 2030 | 2050 | 2100;
-  dataReleaseId: string;
-};
-```
-
-The result panel, marker, overlay, legend, and share URL are derived from this
-selection and change atomically. On a rapid scenario, horizon, search, or map
-change, abort outstanding range reads and increment an evaluation token. A
-completed evaluation is applied only if both its token and selection still
-match the current state. A previous result may remain visible during an update,
-but it must be labelled as updating and cannot appear associated with the new
-controls.
-
-## URL and persistence state
-
-URL parameters are the durable, shareable state for coordinate or place,
-scenario, horizon, and release. Parsing is strict; invalid or unavailable
-values fall back to documented defaults with an accessible notice.
-
-Do not persist raw search text or location history. Browser caches contain
-public release resources, not user profiles. A page reload reconstructs a
-selection from the URL and re-evaluates it against the pinned release.
-
-## Map architecture
-
-`MapSurface` initializes one MapLibre instance and keeps it outside React
-render state. It:
-
-- starts with a Europe-wide view;
-- registers the PMTiles protocol before adding release layers;
-- displays required OpenFreeMap/OpenMapTiles/OpenStreetMap attribution;
-- keeps pan and zoom usable during assessment;
-- renders a non-colour-only marker and accessible textual location;
-- swaps overlays and legends as one operation after a selection is accepted;
-- exposes a textual result and controls that do not require interaction with
-  the canvas;
-- shows assessment data without a basemap if the public basemap is unavailable.
-
-Map clicks may refine a selected location. They use the same assessment engine
-as settlement selections and must not create a second implementation of the
-domain flow.
-
-The Phase 2 implementation keeps `MapExplorer` and the MapLibre/PMTiles adapter
-as separate dynamic entries. `MapExplorer` receives a controlled `Selection`
-and `SelectionCommand`; only the visual quantile band is local presentation
-state. `MapLayerResolver` can return only the active dataset's `visual-only`
-PMTiles URL from `ReleaseContext`. Optional support/coastal boundary roles are
-discovered from that same context when present. The committed synthetic fixture
-currently contains the nine projection archives but no separate boundary
-artifacts, so its grid-cell outlines and manifest extent are the only boundary
-context shown in clean-clone tests.
-
-## Offline and cache behaviour
-
-The service worker uses release-scoped cache names. Cache Storage holds only
-byte-verified complete shell and approved release resources. Bounded IndexedDB
-may hold only complete integrity-authorized analysis COG chunks. PMTiles stays
-network-only and visual-only with a `no-store` caching policy; it cannot enter
-Cache Storage, IndexedDB, or the session-memory range store without the
-separate promotion contract required by ADR-026. Cache cleanup may delete old
-releases only after exact fresh-boot authority is reconciled and the current
-worker proves that no active, unknown, or unresponsive client uses them. The
-active complete pair and immediately previous complete pair are retained;
-private Candidate sessions never enter production retention.
-
-The production shell inventory is generated from the recursive Vite main
-graph and exact references in emitted JavaScript and CSS. It includes lazy
-`MapExplorer` and `map-runtime` modules, their styles, the settlement-search
-Worker, its Brotli WASM decoder, fonts, and scientific decoder chunks. Build
-inspection independently reconstructs the inventory and rejects drift.
-Release manifests and the exact COG range-integrity bootstrap remain sealed
-members. Visual PMTiles and analysis COG payloads are excluded: search shards
-and only the COG ranges used by an accepted assessment enter their dedicated
-verified stores when requested.
-
-The UI distinguishes:
-
-- online and complete for the current selection;
-- available offline for resources already cached;
-- online required because a needed range is absent;
-- update available for a newer application/release pair.
-
-The baseline does not download all nine Europe-wide layers to every device.
-Region downloads require a separate measured design.
-
-## Component behaviour
-
-### Search and candidate list
-
-- Accepts settlement names and aliases, not street addresses.
-- Handles empty, overly long, no-result, loading, partial-shard, and worker
-  error states.
-- Uses combobox/listbox semantics, announces result count, and preserves focus.
-- Never sends typed text to project-controlled infrastructure.
-
-### Result panel and controls
-
-- Displays location, scenario, horizon, result state, methodology, and release.
-- Uses modeled language and the approved disclaimers.
-- Provides text/icon distinctions in addition to colour.
-- Keeps valid domain results visually distinct from technical failures.
-- Changing a control starts a new local evaluation without an application API.
-
-### Methodology panel
-
-- Reads versioned content from the manifest release.
-- Explains sources, transformation, limitations, resolution, vertical datum,
-  coastal scope, and interpretation.
-- Uses accessible dialog behaviour and restores focus to its trigger.
-
-### Architecture page
-
-- Leads with the product and cost outcomes, then explains technology choices.
-- Shows the data release, Git commit, build date, source licences, artifact
-  sizes, fitness results, STAC, and signed provenance.
-- Separates measured values from targets and identifies the synthetic-data or
-  migration state honestly.
-
-## Performance and loading budgets
-
-- Initial JavaScript is at most 250 KiB Brotli, excluding lazy map/search
-  chunks.
-- Map, architecture detail, search engine, and large indexes are lazy loaded.
-- Search p95 after worker initialization is below 50 ms.
-- Local assessment p95 after required data is cached is below 100 ms.
-- Search-worker initialization is below 1,000 ms on reference mobile hardware.
-- All four Lighthouse category scores are at least 90 on the agreed profile.
-- Browser integration tests assert zero calls to `/assess`, `/geocode`, and
-  `/config`.
-
-These are CI fitness functions, not aspirational prose.
-
-## Accessibility, security, and privacy
-
-- Meet WCAG 2.2 AA for keyboard access, focus, contrast, status announcements,
-  responsive layout, and reduced motion.
-- Provide a non-map path to every result and explanation.
-- Keep MapLibre and data-provider attribution visible.
-- Use a restrictive Content Security Policy and narrow artifact-origin CORS.
-- Ship no cloud credentials, API keys, raw source paths, or signing secrets.
-- Do not add analytics that captures search text or coordinates. Any future
-  analytics requires privacy review and explicit documentation.
-- Treat manifest text, aliases, and external metadata as untrusted input; render
-  it as text rather than HTML.
-
-## Test boundaries
-
-- Domain modules: unit and property tests for scope classification, source-grid
-  selection, coordinate edges, quantile mapping, and all four states.
-- Search worker: normalization, multilingual aliases, deterministic ranking,
-  duplicate places, stale tokens, and both shards.
-- Data adapters: manifest/schema failure, range reads, nodata, aborts, and
-  release mismatches.
-- Components: keyboard flows, focus recovery, live regions, controls, and all
-  result/error presentations.
-- Integration: search → select → assess → change controls → map click → share →
-  reload, with network assertions proving that no application API is used.
-- Offline: warm caches, remove the network, repeat supported flows, and verify
-  honest failure for uncached data.
-
-## Implemented runtime boundary
-
-The checked-in frontend is the React/Vite static application described here.
-It loads fixture-compatible artifact contracts and performs assessment in the
-browser. The superseded Next.js, TanStack Query, and application API runtime
-has been removed under ADR-025. Browser code must remain independent of
-PostGIS, TiTiler, Azure Maps, and a Next.js server.
+Build inspection enforces separate initial JS budgets, lazy-worker boundaries,
+CSP and the exact output/precache inventories. Component and browser tests cover
+provider errors, cancellation, URL restoration, accessible controls and edition
+disclosure. These checks do not establish public scientific qualification or
+complete manual accessibility conformance; see [10](10-testing-strategy.md).
