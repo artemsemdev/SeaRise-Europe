@@ -1,308 +1,156 @@
-# 16 — Offline Geospatial Data Pipeline
+# 16 — Geospatial Data Processing
 
-> **Status:** Phase 0R approved; Phase 1 offline candidate builder implemented
->
-> **Sources of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](adr/ADR-024-ar6-regional-projection-contract.md)
-> **Publication warning:** the repository's current `demo.tif` and synthetic tests prove software mechanics only. They are not scientific evidence or a production data release.
+> **Status:** Implemented atlas raster adapter and retained offline AR6 pipeline,
+> reviewed 2026-10-04. These are independent processing paths.
 
-## 1. Purpose
-
-The pipeline moves expensive and stateful work out of user requests. It
-downloads a pinned source snapshot once, transforms it reproducibly, validates
-scientific and technical contracts, and publishes an immutable release that a
-static browser application can query directly.
+## Processing map
 
 ```mermaid
 flowchart LR
-    Pin["Pin sources + licences"] --> Fetch["Fetch + SHA-256"]
-    Fetch --> Inspect["Inspect real schemas/units"]
-    Inspect --> Geo["Normalize geometry + settlements"]
-    Inspect --> Raster["Normalize raster/projection inputs"]
-    Geo --> Compute["Build projection arrays"]
-    Raster --> Compute
-    Compute --> Pack["COG + PMTiles + GeoParquet + indexes"]
-    Pack --> QA["Scientific + contract + artifact QA"]
-    QA --> Metadata["Manifest + STAC + provenance + signature"]
-    Metadata --> Stage["Upload immutable staging prefix"]
-    Stage --> Verify["Public range/hash/browser verification"]
-    Verify --> Promote["Pin/promote release"]
+    Provisioned[Provisioned CoCliCo + places + basemap] --> Verify[Local startup validation]
+    Verify --> Inspect[Native-cell point inspection]
+    Verify --> Tiles[Warped display PNGs]
+    Inspect & Tiles --> Atlas[Coastal atlas]
+    Sources[Pinned AR6 / geography / GeoNames] --> Acquire[Verified acquisition]
+    Acquire --> Build[Offline source and artifact stages]
+    Build --> Candidate[Immutable AR6 candidate]
+    Candidate --> Browser[Retained projection reference]
+    Candidate --> Evidence[Separate signing / verification evidence]
 ```
 
-The pipeline may use Python, GDAL, Rasterio, rio-pmtiles, DuckDB Spatial, and
-other pinned command-line tools. Its native dependencies do not run in
-production.
+Neither path derives atlas flood depth by comparing relative AR6 change with
+absolute terrain. The rejected binary methodology remains historical.
 
-## 2. Current implementation boundary
+## Atlas source boundary
 
-`src/pipeline/` contains the retained deterministic source, scientific,
-artifact, and offline-release build planes. It has no mutable database
-registration or request-time publication path. Publication and live provider
-activation remain explicitly separate from candidate construction.
+The checked-in atlas implementation consumes an existing local workspace; it
+does not acquire CoCliCo rasters or construct the full place/basemap package
+from a clean clone. [Node activation](../../src/web/scripts/real-local-atlas.mjs)
+validates disk manifest v2, six unique SSP585 year/defense combinations, confined
+TIFF paths, expected bytes, EPSG:3035 and 25 m pixel-size metadata. It emits a
+separate browser-safe catalog.
 
-The approved Phase 0R implementation includes the SHA-256-locked AR6 reader, exact
-source-grid lookup, nine COG/GeoParquet/PMTiles triplets, manifest/STAC,
-candidate sealing, cross-artifact parity, and browser budget measurement.
-#110's trusted dual-platform evidence and protected owner disposition are
-complete and opened Phase 1.
+[`loadRealLocalContext`](../../src/web/scripts/real-local-context.mjs) checks the
+Brotli place-index size/hash, schema, count and unique IDs. Source aliases and
+population remain Node search inputs; only safe place fields go to the browser.
+Prepared basemap files are confined by path/media type when served.
 
-The target `searise_pipeline.offline_release` package now compiles checked-in
-fixture/regional/full profiles into one receipt-bound seven-stage graph. It
-verifies identities before cache reuse, validates the complete v1 public
-release, and atomically assembles an immutable candidate in a pinned,
-network-disabled container. The builder cannot publish or activate a release;
-see the [operator runbook](../operations/offline-release-builder.md) and
-[implementation evidence](../evidence/phase-1-offline-release-builder.md).
-The static browser application and committed fixture consume the same release
-contracts. Public R2 publication remains roadmap work and is not implied by a
-successful local candidate build.
+Python verifies each unique source raster SHA-256 before readiness and rejects
+conflicting identities for a reused file. No private input is copied into the
+application build. Demo preflight exercises this startup; candidate preparation
+also binds six external manifest/receipt identities without packaging their
+large source files.
 
-## 3. Inputs and pinning
+## Atlas point and tile processing
 
-| Source | Role | Pinning requirements |
-|---|---|---|
-| IPCC AR6 sea-level projections | Scenario/horizon projection input | Authoritative release/version, exact asset URL, size, SHA-256, citation, licence/acknowledgements |
-| Natural Earth product geometries | Europe support and 25 km coastal product scope | Release, layer names, processing recipe, licence, SHA-256, topology controls |
-| GeoNames dump + `alternateNamesV2` | Places and multilingual search | Snapshot date, exact dump files, sizes, SHA-256, CC BY 4.0 attribution |
+[`Atlas.inspect`](../../scripts/atlas/europe_raster_service.py) performs:
 
-Acquisition writes to an ignored cache such as `data/raw/{source}/{version}/`.
-It never relies on an unversioned “latest” response without capturing the
-resolved version and checksum. A second run reuses only a matching verified
-file. HTML login pages, truncated ranges, unexpected media types, and checksum
-mismatches fail immediately.
+1. Validate finite longitude/latitude and supported defense setting.
+2. For each of 2030, 2050 and 2100, inspect sources whose declared bounds contain
+   the coordinate.
+3. Require the original north-up 25 m EPSG:3035 grid; transform the point from
+   WGS84 and read the containing native cell with no interpolation.
+4. Keep finite, unmasked, nonnegative values. Where sources overlap, use their
+   maximum valid depth.
+5. Return positive depth as `flooded`, valid 0 as `zero`, no valid sample as
+   `unknown`/null. Read failures propagate as technical failures.
 
-Before download, the build records whether the raw source and intended
-derivatives may be stored, redistributed, and publicly attributed. No licence
-means no publication.
+`Atlas._render_tile` creates a 256 × 256 Web Mercator grid, selects eligible
+source overviews, warps with nearest-neighbor resampling and combines overlapping
+valid values by maximum. It keeps an independent validity mask. Positive depth
+gets color/alpha; valid zero and unknown both appear transparent, so measured
+valid/flood counts accompany every PNG.
 
-## 4. Phase 0 — prove the science first
+Display overview/warp choices do not alter point inspection or the native
+resolution claim. Raster work uses bounded concurrency and RAM caching;
+[15](15-performance-and-scalability.md) records the actual limits. This is
+request-time local raster processing, not the retained AR6 offline builder.
 
-Phase 0R proves the direct AR6 projection product over a regional fixture that
-includes all four European basin contexts, estuaries, islands, scope failures,
-distance boundaries, and source nodata controls. It must:
+## Retained Python package
 
-1. Inspect the exact IPCC variables, dimensions, coordinates/locations,
-   quantiles, units, and missing-value semantics.
-2. Preserve exact native grid IDs and integer millimetres while packaging the
-   nine scenario/horizon combinations; no scientific resampling is permitted.
-3. Validate nearest-grid selection, the inclusive 100 km guardrail, tie-break,
-   scope precedence, and stable unavailable reason codes.
-4. Compare independently extracted source values with Python, TypeScript, COG,
-   GeoParquet, PMTiles, and exact browser lookup.
-5. Prove complete source, licence, manifest, STAC, provenance, and receipt
-   binding plus byte-identical clean rebuilds.
-6. Measure source, intermediate, COG, PMTiles, and index size; build time;
-   browser range requests; latency; and memory.
+[`src/pipeline/searise_pipeline`](../../src/pipeline/searise_pipeline/) contains:
 
-Results and reviewer decisions are committed as methodology documentation and
-machine-readable golden fixtures. The Phase 0 v1 binary model already stopped
-with a no-go and remains historical evidence; ADR-024 is the only active
-publication contract.
+| Package | Current responsibility |
+|---|---|
+| `sources` | Source locks, verified acquisition/cache and receipts |
+| `science` | AR6 readers/lookup plus retained scientific and historical no-go controls |
+| `settlements` | Raw GeoNames parsing, catalogues, pinned spatial stages, coast distance, reconciliation and search projection |
+| `release` | COG, GeoParquet, PMTiles, source grid, contracts, evidence, reproducibility and promotion validation |
+| `offline_release` | Receipt-bound build profiles, stages, cache reuse and atomic local candidate assembly |
+| `candidate_completeness` | Assembly, artifact/byte QA and complete-candidate validation |
+| `supply_chain` | Tool/dependency profiles, SBOM, signing/verification/readback and evidence retention |
+| `regional_fixture` | Retained regional evidence, including superseded blocked-method controls |
 
-## 5. Workspace and release directories
+The package entry points are defined in
+[`pyproject.toml`](../../src/pipeline/pyproject.toml). Checked-in source locks,
+requirements and profile files define the exact tools for a given operation;
+this is not a runtime database or a blanket claim that all profiles are
+self-contained in a clean clone.
 
-Recommended local/CI layout:
+## AR6 sources and artifact rules
+
+The source reader preserves locked archive/member identity, native locations,
+scenario/horizon, units and required quantiles. The regional release contract
+uses a 76 × 46 one-degree subset. Each of the nine combinations retains:
 
 ```text
-data/
-├── raw/                         # ignored, checksum-verified source cache
-├── work/{buildId}/              # ignored, resumable intermediates
-├── geometry/                    # checked-in migration/reference fixtures
-└── releases/{dataReleaseId}/    # candidate immutable release tree
+band 1: q0.167, Int16 millimetres
+band 2: q0.5,   Int16 millimetres
+band 3: q0.833, Int16 millimetres
+nodata: -32768
 ```
 
-`dataReleaseId` must be stable and unique, for example a source-date plus a
-short content hash. A stage may be resumed only when its input hashes,
-parameters, code version, and tool-image digest match its recorded receipt.
-Partial or failed releases are never promoted.
+COG, analytical GeoParquet and visual PMTiles preserve source IDs and exact
+integer values. Browser lookup selects the nearest native location with the
+inclusive 100 km guardrail and lowest-ID ties; it does not interpolate or use
+rendered color. Scientific parity and format correctness are separate checks.
 
-## 6. Processing stages
+Support/coastal geometry is release-scoped product scope, not flood reach.
+The retained settlement path validates raw GeoNames/alternate-name inputs,
+normalizes eligible places, performs pinned spatial classification and shoreline
+distance work, reconciles accepted/rejected records, and publishes GeoParquet
+plus serialized browser indexes. Core membership uses population >=500 or
+administrative/national capitals; coastal membership uses the versioned coastal
+zone without a population threshold. Actual source contracts and anomaly
+policies live beside the implementation, not in atlas's simpler place schema.
 
-### 6.1 Inspect and normalize sources
+## Offline build graph
 
-- validate expected files, variables, columns, geometry types, CRS, units, and
-  ranges before transformation;
-- normalize timestamps, nodata, longitude convention, field names, and text
-  encoding explicitly;
-- write a machine-readable inspection report and row/cell counts;
-- retain source-native identifiers throughout lineage.
-
-Unexpected source schema is a hard failure. The code must not “best effort” a
-scientific interpretation.
-
-### 6.2 Build support and coastal geometry
-
-Use valid polygonal geometry in the chosen analysis CRS for metric operations,
-then derive WGS84/browser forms. Record source layers, filters, clipping,
-buffer distances, simplification tolerances, and topology repairs.
-
-Validate:
-
-- geometry validity and expected bounds;
-- known inside/outside/boundary controls;
-- islands, ports, estuaries, and transcontinental edge cases;
-- area and spatial differences against the previous release;
-- explicit treatment of Russia, Turkey, and other open support-boundary cases.
-
-The Natural Earth-derived 25 km zone remains labelled a product-scope
-`approximation`. Phase 0.8 re-confirms it as the external-review candidate
-after comparison with Copernicus Coastal Zones; it is not a hazard extent.
-
-### 6.3 Build the settlement catalog
-
-Before any join, the typed GeoNames boundary parser binds `allCountries.txt`
-and `admin1CodesASCII.txt` to the scoped 2026-08-10 source identities. It
-requires strict UTF-8, exact 19/4-column rows, canonical IDs and numeric/date
-forms, finite bounded coordinates, and per-row lineage. Provider-native
-Unicode, nullable feature fields, signed raw population, and free-form admin
-values are preserved at this raw boundary; catalog eligibility and join
-semantics are separate fail-closed stages.
-
-The snapshot-bound `geonames-place-raw-anomalies-v1` policy preserves and flags
-DEL/C1 codepoints, edge ASCII spaces in aliases, negative raw populations, and
-the provider's four non-place leading-empty country placeholders. Downstream
-normalization must quarantine flagged rows unless its contract accepts the
-specific class; trailing/interior empty tokens remain invalid. The admin1 asset
-has no accepted anomaly class and fails closed on unexpected controls.
-
-DuckDB Spatial performs the reproducible joins:
-
-1. ingest pinned GeoNames places and alternate names;
-2. retain active populated-place feature codes defined in ADR-021;
-3. normalize canonical/ASCII/alternate names and administrative labels;
-4. intersect records with the versioned Europe support geometry;
-5. compute metric `distanceToCoastMeters` and `isCoastal` against the versioned
-   coastal rule;
-6. create `europe-core` and `europe-coastal` logical sets;
-7. reconcile accepted, duplicate, and rejected counts;
-8. write canonical `settlements.parquet` and deterministic serialized indexes;
-9. Brotli-compress `europe-core.codepoint-trie.json.br` and
-   `europe-coastal.codepoint-trie.json.br`.
-
-The core set uses population >= 500 plus national/administrative capitals. The
-coastal set keeps every qualifying active place in the coastal zone, including
-villages with zero or missing population. Catalog membership is a statement
-about the pinned GeoNames snapshot, not a claim of perfect real-world coverage.
-
-### 6.4 Preserve the source-native projection grid
-
-Read `sea_level_change` from each locked AR6 member at q0.167, q0.5, and
-q0.833. Preserve the native one-degree grid identity and exact integer
-millimetres. Package the declared 76 x 46 regional subset without scientific
-interpolation, extrapolation, tide-gauge fallback, or nodata substitution.
-
-The browser selects the nearest source-grid location by unrounded Haversine
-distance, uses the lowest source location ID for an exact tie, and rejects a
-location beyond 100 km. The same source identity and values must survive every
-artifact representation.
-
-### 6.5 Build exact projection arrays
-
-For each scenario/horizon combination, write three ordered Int16 bands:
+[`StageName`](../../src/pipeline/searise_pipeline/offline_release/model.py)
+defines the implemented ordered graph:
 
 ```text
-band 1 = AR6 q0.167 in integer millimetres
-band 2 = AR6 q0.5   in integer millimetres
-band 3 = AR6 q0.833 in integer millimetres
-nodata = source fill value -32768
+verify-sources → inspect → normalize → derive → package → validate → assemble-release
 ```
 
-The pipeline does not construct an absolute water surface or compare values
-with terrain. `ProjectionAvailable` reports the source median and likely range;
-it is not a flood, inundation, terrain-exposure, or property-risk class.
+[`profiles.py`](../../src/pipeline/searise_pipeline/offline_release/profiles.py)
+compiles fixture, regional and full-Europe profiles, with explicit fixture-ready
+or controlled-input-required availability. The engine binds inputs, parameters,
+code and tools to receipts before cache reuse. It validates stage outputs and
+atomically assembles a new local candidate; failures do not promote partial
+candidates. The pinned offline build runner keeps execution separate from source
+acquisition and public publication.
 
-### 6.6 Package scientific and visual artifacts
+The v1 offline release and v2 browser derivation retain separate schemas and
+identities. The ordinary web build copies committed fixture payloads/overlay;
+it does not run a full source build. See [05](05-data-architecture.md).
 
-From the same validated projection arrays, produce:
+## Validation and promotion
 
-- a lossless three-band analysis COG for exact lookup;
-- visual PMTiles for MapLibre overlay rendering;
-- an exact GeoParquet long table with the same integer values;
-- browser PMTiles and analytical GeoParquet for support/coastal geometry;
-- canonical settlement GeoParquet and compact search indexes.
+Required evidence is owned by the executable scientific, artifact, candidate
+and supply-chain validators: source hashes/rights, exact matrix and values,
+format integrity, settlement reconciliation, manifest inventory, receipts and
+reproducibility. Browser tests add lookup, range delivery and resource authority.
 
-COG validation covers tiling, overviews, compression, CRS/transform, nodata,
-band order, and integer domain. PMTiles validation covers archive structure,
-zoom/bounds, sample tiles, byte ranges, and exact feature-property parity with
-COG and GeoParquet values. Rendered colour is never a source value.
+Protected workflows exist for offline builds, keyless signing and owner
+promotion. Building a candidate or obtaining a signature does not independently
+authorize public atlas hosting or source redistribution. Public readback and
+approval remain separate gates. [The builder runbook](../operations/offline-release-builder.md)
+and [source acquisition guide](../delivery/source-acquisition.md) give exact
+operator procedures.
 
-### 6.7 Generate contracts and evidence
-
-After data QA passes, generate:
-
-- scenario, methodology, and source-attribution JSON;
-- versioned `manifest.schema.json` and valid `manifest.json`;
-- a static STAC catalog, collection, and item for each relevant spatial asset;
-- source/build inspection and data-quality summaries;
-- SLSA-compatible `provenance.intoto.jsonl`;
-- keyless Cosign/Sigstore signature bundle for the manifest/provenance
-  inventory.
-
-The final manifest is generated after artifact bytes are stable so sizes and
-SHA-256 values are exact.
-
-## 7. Release validation gates
-
-The candidate fails unless all of these pass:
-
-- source schemas, units, coordinates, checksums, and licences;
-- exactly 3 scenarios x 3 horizons, with unique and complete layer pairs;
-- approved scientific golden points and Python/browser lookup parity;
-- raster statistics, topology, connectivity, nodata, and release-diff review;
-- COG, PMTiles, GeoParquet, search-index, JSON Schema, and STAC validation;
-- settlement reconciliation and required search ranking cases;
-- manifest inventory, sizes, checksums, source/licence mappings, provenance,
-  and signature verification;
-- initial bundle, worker, search, assessment, Lighthouse, and offline budgets;
-- zero browser calls to `/assess`, `/geocode`, or `/config`.
-
-See [10 — Testing Strategy](10-testing-strategy.md) for fixtures and exact
-fitness functions.
-
-## 8. Staging, publication, and rollback
-
-1. Upload to a new `releases/{dataReleaseId}/` prefix in Cloudflare R2/static
-   assets; never overwrite a prior path.
-2. Compare every uploaded size and hash with the local manifest.
-3. Verify public `HEAD`, byte-range `GET`, `Content-Range`, `ETag`, immutable
-   cache headers, and narrow CORS from the production origin.
-4. Run browser smoke tests against the public candidate from at least two
-   European regions.
-5. Promote by deploying an application build pinned to the release, or by
-   atomically changing the small release pointer.
-6. Retain the prior application/release pair. Roll back by repinning it, never
-   by mutating artifacts.
-
-The target recurring infrastructure cost is zero while the workload fits the
-documented Cloudflare allowances. Every candidate records total bytes,
-estimated range operations, retained releases, and a dated cost model before
-promotion.
-
-## 9. Reproducibility and supply-chain rules
-
-- Pin Python and native tool versions, lock dependencies, and record the build
-  image digest.
-- Record source and intermediate receipts, parameters, code commit, commands,
-  timings, and output hashes.
-- Make stages deterministic and side-effect free until the explicit staging
-  step.
-- Give publishing credentials only to the protected CI environment, with
-  least-privilege write access to new release paths.
-- Sign from CI with keyless identity; do not place long-lived signing keys in
-  the repository.
-- Never publish from an unreviewed local working tree.
-
-## 10. Implementation sequence
-
-1. Implement the Phase 0 regional spike and source-inspection reports.
-2. Define schemas and shared Python/TypeScript golden fixtures.
-3. Add DuckDB Spatial boundary/GeoNames processing and GeoParquet/index output.
-4. Produce COG, GeoParquet, and PMTiles from the same projection arrays and
-   prove exact integer/source-ID parity.
-5. Generate manifest, static STAC, provenance, and signature bundle.
-6. Publish a non-production immutable release and run public delivery tests.
-7. Build all nine real-data layers and complete old/new browser parity.
-8. Only then remove Azure Blob registration, PostgreSQL/PostGIS, TiTiler,
-   Azurite, and the legacy pipeline branches.
-
-This sequence keeps scientific proof ahead of presentation and makes every
-portfolio claim traceable to release evidence.
+AR6 Phase 0R recovery approval is recorded; the old runtime removal is complete.
+There is no remaining implementation step to register blobs in a database or
+retire TiTiler after building these artifacts. Git history and immutable evidence
+preserve those past transitions. Atlas public acquisition/distribution and
+scientific qualification remain open under ADR-028.
