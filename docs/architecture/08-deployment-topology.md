@@ -1,226 +1,122 @@
-# Deployment Topology
+# 08 — Build and Deployment Topology
 
-> **Status:** Accepted target topology
-> **Authority:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Status:** Implemented local/static topology, reviewed 2026-10-04.
+> Cloudflare Static Assets + R2 is a retained reference direction, not an
+> installed infrastructure deployment in this checkout.
 
-## Production shape
+## Executable environments
 
-Production contains two deployable surfaces and no application compute:
+| Environment | Command from repository root | Dependencies |
+|---|---|---|
+| Fixture development | `npm run web:dev` | Node/npm workspace; authored atlas fixture |
+| Fixture build and preview | `npm run web:build`, then `npm run web:serve` | Built `src/web/dist`; preview at `127.0.0.1:4173` |
+| Real-local development | `npm run local:start` | Provisioned atlas data and Python; `127.0.0.1:4181` |
+| Real-local build and preview | `npm run local:build`, then `npm run local:serve` | Matching built edition plus the same local data/Python |
+| Private demo candidate | `npm run demo:preflight`, `demo:prepare`, `demo:serve` with explicit paths | Clean exact source, pinned tools, provisioned data and sealed app inventory |
+| Generic static-host validation | Tools under `tools/static-quality` | Normal fixture build and isolated quality-tool dependencies |
+| Controlled AR6 build/signing | Explicit GitHub workflow dispatch | Pinned inputs, toolchains and protected evidence authority |
+
+Commands are defined in [root package.json](../../package.json) and
+[web package.json](../../src/web/package.json). Use Node 20.20.1 and npm 11.12.1.
+The real-local environment is provisioned separately; details and overrides are
+in the [development runbook](../operations/coastal-atlas-development.md).
+
+## Normal build
 
 ```mermaid
 flowchart LR
-    User[Browser]
-    Site[Cloudflare Workers\nStatic Assets]
-    Data[R2 through\ncustom data domain]
-    Map[OpenFreeMap\npublic basemap]
-
-    User -->|HTML, JS, CSS, small JSON| Site
-    User -->|HEAD + byte-range GET| Data
-    User -. visual context only .-> Map
-
-    subgraph Release[Immutable data release]
-        Manifest[manifest + STAC]
-        Search[search indexes]
-        Geo[PMTiles + COG + GeoParquet]
-        Proof[provenance + signature]
-    end
-
-    Data --- Release
+    Source[Web source + authored atlas fixture] --> Vite[Vite multipage build]
+    AR6[Committed AR6 v1 fixture + v2 browser overlay] --> Vite
+    Vite --> Dist[Static dist directory]
+    Dist --> Root[Atlas /]
+    Dist --> Reference[Projection /projections/]
+    Dist --> About[Reference /about/architecture/]
+    Dist --> Worker[Projection service-worker.js]
 ```
 
-There is no production ASP.NET service, Next.js server, PostgreSQL/PostGIS,
-TiTiler, Azurite, queue, runtime geocoder, or application-managed session. A
-Cloudflare Worker function is not part of the baseline; Workers Static Assets
-is used as a static host.
+Vite copies the committed projection fixture for the default synthetic release.
+Build finalization seals the projection precache, emits deterministic delivery
+sidecars, and validates target content and the exact output inventory. Unknown
+files, symlinks and private candidate material are rejected by build checks.
+See [vite.config.ts](../../src/web/vite.config.ts),
+[finalize-service-worker.mjs](../../src/web/scripts/finalize-service-worker.mjs)
+and [inspect-build.mjs](../../src/web/scripts/inspect-build.mjs).
 
-## Origin allocation
+The architecture route remains a projection reference page, not a generated
+atlas release report. Its document is not part of the offline precache.
 
-| Content | Canonical origin | Cache policy |
-|---|---|---|
-| HTML entry points and service worker | Static site domain | Short TTL or revalidation; must activate atomically |
-| Hashed JavaScript, CSS, fonts, icons | Static site domain | `public, max-age=31536000, immutable` |
-| Small pinned config/search files within platform limits | Static site or canonical data domain | Immutable release path |
-| Visual PMTiles | R2 custom data domain | Network-only `no-store` request and response policy from ADR-026 |
-| Analysis COG, GeoParquet, large indexes, STAC and provenance | R2 custom data domain | `public, max-age=31536000, immutable` |
-| `/release.json`, if used | Static site domain | Short TTL plus revalidation; discovery only |
-
-An application build contains or resolves one explicit `dataReleaseId`. It
-must not consume “latest” during a session. Each release is stored under
-`/releases/{dataReleaseId}/...`; objects in that prefix are append-only.
-
-Before deployment, `scripts/inspect-build.mjs` reconstructs the complete output
-allowlist from fixed document roots, the exact Vite manifest, the embedded
-shell-precache manifest, referenced source maps, and the selected release
-manifest. Every output must be a regular file on that list; unknown archives,
-private Candidate material, and emitted code that requests `/assess`,
-`/geocode`, or `/config` fail the build. This validation uses only committed
-fixture output and never discovers or scans Candidate-v7.
-
-R2 must support `GET`, `HEAD`, and byte-range requests with the CORS and exposed
-headers in ADR-021. Large artifacts use one public canonical URL so browser,
-STAC, manifest, and smoke tests all address the same object.
-
-The manifest's generic `publication.cacheControl` remains the immutable default
-for release objects. ADR-026 is the role-specific delivery override for visual
-PMTiles: host/R2 metadata must return `Cache-Control: no-store` for PMTiles
-`200`, `206`, and `416` responses. The object path is still append-only and
-hash-bound, but neither the browser nor an intermediary may persist its bytes.
-Analysis COGs and other release objects retain immutable delivery; only
-integrity-authorized COG chunks may enter bounded IndexedDB persistence.
-
-## Environments
-
-| Environment | Purpose | Data | Publication rule |
-|---|---|---|---|
-| Local | UI and pipeline development | Small checked-in fixtures or ignored source cache | No cloud credential required |
-| Pull request | Static preview and browser/contract tests | Fixed fixture release | Untrusted; cannot publish production data |
-| Staging | Real regional spike and release candidate | Immutable `rc-*` prefix | Protected approval; production-like headers/ranges |
-| Production | Public portfolio site | Signed, validated release | Protected environment and explicit activation |
-
-Preview deployments may use the static host's preview URLs, but R2 CORS must
-not be expanded to arbitrary origins. Use a controlled preview-origin pattern
-or a separate non-production bucket. Production and non-production publish
-credentials are distinct.
-
-## Infrastructure as code
-
-OpenTofu is the source of truth for provider-managed infrastructure. The
-configuration should stay small and portable and manage, at minimum:
-
-- R2 production and non-production buckets;
-- bucket CORS and lifecycle protections;
-- custom data domain and required DNS records;
-- cache rules and security headers that cannot be expressed in the static app;
-- static-site project/environment bindings;
-- budget or usage notifications where supported;
-- least-privilege CI publication identities and protected variables, without
-  storing secret values in state or Git.
-
-Remote OpenTofu state, if used, is encrypted, access-controlled, and not public.
-State changes and plans are reviewed before apply. Tool and provider versions
-are pinned. The infrastructure must not introduce Cloudflare D1, KV, Durable
-Objects, Queues, or Worker-only business logic into the baseline.
-
-The checked-in HTML applies the restrictive static-document CSP and
-`no-referrer` policy on every host. Infrastructure must repeat that CSP as a
-response header and append `frame-ancestors 'none'`, which browsers ignore in
-a meta CSP, together with the remaining response-only security headers. A
-separate release-data origin cannot be activated until its exact origin is
-reviewed into CSP and CORS; wildcards are not part of the baseline.
-
-## Build and release flow
-
-Data release and application deployment are separate, ordered jobs:
+## Real-local runtime
 
 ```mermaid
-sequenceDiagram
-    participant CI as Protected CI
-    participant B as Offline build
-    participant R2 as R2 release prefix
-    participant S as Static site
-    participant Q as Synthetic checks
-
-    CI->>B: Build pinned sources and artifacts
-    B->>B: Scientific, schema, licence, hash tests
-    B->>B: Generate provenance and Cosign signature
-    CI->>R2: Upload new immutable release
-    CI->>Q: Verify hashes, headers, CORS and ranges
-    Q-->>CI: Release candidate passes
-    CI->>S: Deploy app pinned to new dataReleaseId
-    CI->>Q: Exercise search, assess and offline smoke tests
-    Q-->>CI: Application/release pair healthy
+flowchart LR
+    Browser[Atlas browser] --> Vite[Vite dev or preview on loopback]
+    Vite --> Context[Node place search + basemap file reads]
+    Vite -->|raster proxy| Python[Python on ephemeral loopback port]
+    Context --> Local[Provisioned atlas root]
+    Python --> Local
 ```
 
-The required order is:
+The edition plugin installs middleware only in real-local mode. It verifies
+that a preview's mode matches the HTML edition marker. Normal fixture mode does
+not load the local adapter. Starting or previewing real-local launches Python;
+a Vite build by itself does not provision data or start that service.
 
-1. Build from a clean code revision and pinned source manifest.
-2. Pass scientific, contract, security, licence, and architecture fitness
-   functions.
-3. Generate `manifest.json`, STAC, SLSA-compatible provenance, and a keyless
-   Cosign signature.
-4. Upload into a new release prefix; never overwrite a released object.
-5. Read back and verify every checksum plus representative full and range
-   requests from the public custom domain.
-6. Deploy the small application build pinned to that release.
-7. Run production browser and synthetic smoke tests.
-8. Record the successful app commit/release pairing in the release inventory.
+The default root is the main checkout's `local-data/atlas/europe`, including
+from a Git worktree. `SEARISE_ATLAS_ROOT` and `SEARISE_ATLAS_PYTHON` are explicit
+operator overrides. Copying real-local `dist` to a generic static host leaves
+`/atlas-data` unavailable; it is not a deployable real-data atlas by itself.
 
-Failure before step 6 leaves an unreferenced candidate release and does not
-affect users. Failure after step 6 triggers application rollback.
+## Sealed local demo
 
-## Rollback and retention
+The [candidate launcher](../../scripts/demo/demo.mjs) preflights provisioned
+inputs, builds a clean exact source commit into a new
+`.cache/demo-candidates/<name>/app`, records inventory/data identities in
+`candidate.json`, verifies them and seals the output read-only. It never
+packages the external rasters or overwrites an earlier candidate.
 
-Rollback is a pointer/deployment change, never in-place data mutation:
+Serve verifies that same clean commit and candidate/data hashes, starts the
+local adapter, and runs a [sealed Vite preview](../../scripts/demo/sealed-preview.mjs)
+with `configFile: false`, `envDir: false`, loopback host and strict port. The
+retained reference uses manifest-allowlisted release delivery from the sealed
+app. Static shell responses revalidate; private atlas responses remain
+`no-store`. A lifecycle owner closes preview and reaps the raster process.
 
-- redeploy the last known-good application build pinned to its original
-  `dataReleaseId`;
-- verify the previous manifest, range requests, search, and representative
-  assessments;
-- retain the failed release for investigation and reproducibility;
-- remove a release only under a reviewed retention or security/legal procedure.
+This is the implemented private demo workflow described in the
+[candidate runbook](../operations/local-demo-candidate.md), not an automatic
+public deployment. The checked-in [demo prerelease notes](../releases/v0.1.0-rc.1.md)
+describe a source-only prerelease with no private data distribution.
 
-Keep at least the current and previous production application/release pairs
-available. A rollback drill is a release gate before decommissioning the old
-runtime.
+## HTTP and storage requirements
 
-## Availability and failure isolation
+Projection artifacts use the checked-in
+[delivery policy](../../contracts/http-delivery/v1/policy.json): correct media
+types, lengths, hashes/ETags and byte ranges; visual PMTiles overrides immutable
+caching with `no-store`. Current fixture output is same-origin. Any separate
+public data origin requires reviewed CSP/CORS and public readback evidence.
 
-- The application shell and eligible cached scientific/text data continue to work according to the
-  explicit offline policy when origins are unavailable.
-- R2 outage, unavailable network-only PMTiles, or missing uncached COG ranges produces an availability message, never
-  a guessed assessment.
-- OpenFreeMap outage removes visual context only; local search and assessment
-  remain authoritative and functional when their data is cached.
-- A broken mutable release pointer cannot alter an already loaded session
-  because the application pins its release.
-- Old immutable releases remain cacheable and recoverable during a new release
-  incident.
+Atlas catalog/search/inspection/tiles and local basemap full/range responses
+use `no-store`. These local routes are GET-only,
+not the projection release's GET/HEAD interface.
 
-## Cost controls
+The generic-host harness checks all three documents, static 404s, build/release
+identity, assets and absence of retired endpoints. It proves portable fixture
+delivery; it does not prove public R2 provisioning or real-local portability.
 
-The intended idle infrastructure cost is EUR 0/month while usage remains in
-the current Cloudflare free allowances, excluding the custom-domain
-registration. This is a target, not a guarantee.
+## Publication and rollback status
 
-Before activation, each release records:
+No `.tf`/OpenTofu configuration or Cloudflare application deployment config is
+checked in. The protected offline builder, signing and owner-promotion workflows
+produce/validate candidate evidence; they are not a public atlas deployment
+pipeline. Public rights, acquisition reproducibility and distribution remain
+open under ADR-028.
 
-- R2 stored bytes by artifact type;
-- expected initial and typical user transfer;
-- representative range-request count per assessment and map session;
-- current dated provider allowance/pricing assumptions;
-- threshold alerts and the cost owner.
+For a future public projection deployment, preserve immutable release paths and
+redeploy a verified previous app/release pair on rollback. Browser storage is
+not deployment authority. Projection updates activate naturally after existing
+tabs close; the active session cannot switch to a different release mid-flow.
+Local atlas rollback instead requires matching application source and a verified
+provisioned workspace; there is no atlas versioned offline update mechanism.
 
-Aggregate storage, operations, traffic, error, and cost metrics are reviewed.
-An architecture change is required before introducing paid always-on compute.
-
-## Portability contract
-
-Cloudflare is the reference host, not an application dependency. A replacement
-platform must provide:
-
-- HTTPS static hosting;
-- object storage or CDN with `GET`, `HEAD`, byte ranges, CORS, role-specific
-  `no-store` delivery for visual PMTiles, and immutable cache headers for other
-  release objects;
-- atomic deployment or a recoverable application pointer;
-- the ability to serve PMTiles, COG, GeoParquet, JSON, STAC, and Sigstore
-  bundles without format conversion.
-
-Provider-specific business logic is prohibited in the baseline. This keeps a
-future move to Azure, AWS, another CDN, or self-hosted object storage a delivery
-change rather than a product rewrite.
-
-## Deployment acceptance checks
-
-A production deployment is complete only when automation proves:
-
-- the app and manifest pin the same `dataReleaseId`;
-- all nine scenario/horizon artifacts exist and match declared hashes/sizes;
-- HTML is revalidated and content-hashed assets are immutable;
-- R2 `HEAD` and partial `GET` return correct range and CORS headers;
-- no runtime request targets an application API, database, or tile server;
-- a representative eligible scientific/text cached flow works after network
-  removal, while visual PMTiles remains honestly network-only;
-- `/about/architecture` exposes the release, commit, provenance, sizes, and
-  current fitness-function evidence;
-- rollback metadata identifies a verified previous pair.
+Cloudflare's cost target and two-origin model belong to the retained design.
+There is no measured production bill, configured uptime monitor or installed
+budget alert to report as current implementation. See [09](09-observability-and-operations.md).

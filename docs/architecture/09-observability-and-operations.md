@@ -1,200 +1,91 @@
-# Observability and Operations
+# 09 — Observability and Operations
 
-> **Status:** Accepted target operating model
-> **Authority:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Status:** Repository tooling and local operations, reviewed 2026-10-04.
+> Production monitoring and hosting intentions are not installed services.
 
-## Operating principle
+## Available evidence
 
-SeaRise Europe operates a versioned data product and static application, not a
-request-processing service. There are no application-server logs, database
-health checks, background queues, or tile-server dashboards. Operational
-evidence must answer four questions:
-
-1. Was this release built from the declared sources and code?
-2. Are its artifacts intact and deliverable through byte-range HTTP?
-3. Can representative browsers search and assess correctly and quickly?
-4. Can the previous application/release pair be restored safely?
-
-Observability is release-centric, synthetic, and privacy-minimizing.
-
-## Evidence layers
-
-| Layer | Evidence | Retention/use |
+| Area | Implemented evidence | Scope |
 |---|---|---|
-| Build | Source hashes, tool versions, parameters, test summaries, CI logs | Attached to release/provenance and CI retention |
-| Artifact | Manifest/STAC schemas, sizes, SHA-256, PMTiles/COG verification, licences | Immutable with each release |
-| Delivery | Public `HEAD`/range probes, cache/CORS/security headers, aggregate R2/CDN metrics | Continuous checks and release report |
-| Browser | Synthetic search/assessment/offline flows, Web Vitals, console/network errors | Versioned run results; no user query collection |
-| Portfolio | Current release, commit, performance budgets, cost assumptions, provenance links | `/about/architecture` |
+| Frontend build | Exact output, precache, CSP and separate initial JS size checks in `inspect-build.mjs` | Current build; no public hosting claim |
+| Browser behavior | Vitest and Playwright assertions, screenshots and traces | Fixture journeys; separately provisioned real-local journeys |
+| Static delivery | Generic-host validation and Lighthouse runner | Local production-build harness |
+| Atlas raster service | Startup digest checks, readiness message, HTTP errors and tile validity counts | Local source/transport health |
+| Private demo candidate | Exact source, toolchain, app inventory and external metadata identities | Local reproducible handoff; does not package or publish rasters |
+| AR6 pipeline | Stage receipts, source/artifact hashes, parity and candidate validators | Exact inputs/profile/revision of the run |
+| Supply chain | SBOM, signing, verification and readback receipts | Controlled evidence flow; not ordinary fixture output |
+| Architecture route | Build ID, release ID, disposition and manifest path | Retained projection reference only |
 
-The release manifest is the inventory source of truth. A dashboard or log entry
-must reference `dataReleaseId` and application commit so evidence from different
-versions cannot be combined accidentally.
+The implementation has no application analytics collector, telemetry backend,
+production metrics dashboard, scheduled multi-region availability probes or
+configured cloud cost alerts. Consequently no measured uptime/SLA or zero-cost
+production result is asserted here.
 
-## Service indicators and targets
+Source anchors: [CI](../../.github/workflows/ci.yml),
+[static quality](../../.github/workflows/static-quality.yml),
+[build inspection](../../src/web/scripts/inspect-build.mjs),
+[raster service](../../scripts/atlas/europe_raster_service.py),
+[architecture page](../../src/web/src/routes/ArchitecturePage.tsx).
 
-The baseline targets are release gates rather than a claim of contractual SLA:
+## Local atlas diagnosis
 
-| Indicator | Target | Measurement |
-|---|---:|---|
-| Site reachability | >= 99.9% monthly observation success | Multi-region HTTPS synthetic probe |
-| Manifest reachability and validity | >= 99.9% monthly observation success | Fetch, schema, release-ID check |
-| Large-object range delivery | >= 99.9% monthly observation success | `HEAD` and representative partial `GET` |
-| Search p95 after worker initialization | < 50 ms | Production browser profile in CI/synthetic run |
-| Local assessment p95 after data is cached | < 100 ms | Production browser profile |
-| Search worker initialization | < 1,000 ms on reference mobile hardware | Release benchmark |
-| Initial JavaScript, Brotli | <= 250 KiB, excluding lazy chunks | Bundle report |
-| Lighthouse performance/accessibility/best-practices/SEO | >= 90 each | Agreed mobile profile |
-| Runtime application API calls | 0 | Browser network assertion |
-| Valid scenario/horizon combinations | exactly 9 | Manifest and artifact validation |
+1. Confirm the intended edition and use matching build/serve commands.
+   A preview marker mismatch is a startup error; rebuild the selected edition.
+2. For real-local, check the explicit data root, interpreter and confined
+   manifest/index/raster files. Startup verifies these before serving the app.
+3. Treat HTTP, JSON, PNG or source-read failure as a technical failure. Do not
+   repair it by selecting fixture data or replacing unknown with zero.
+4. Distinguish map geography failure from flood-tile failure and point
+   inspection. Their UI errors/retries are separate.
+5. Stop the Vite server to terminate its owned Python process. The raster proxy
+   has a 30-second timeout and disconnect cancellation; it is not a background
+   production daemon.
 
-The deployment pipeline fails on a budget regression unless the pull request
-contains a measured waiver with rationale, owner, and expiry date. Waivers are
-not silently carried into the next release.
+Python suppresses default request access logs. Search/inspection still cross
+loopback in GET URLs, and the UI writes current view state to the document URL.
+No repository evidence proves that arbitrary future hosting/proxy logs are
+scrubbed. See [07](07-security-architecture.md).
 
-## Release-time monitoring
+## Projection diagnosis and recovery
 
-Every candidate release produces a machine-readable and human-readable report
-containing:
+A manifest identity/schema failure stops release bootstrap. Retry only the
+pinned release. A missing range, integrity failure or unavailable store is a
+technical state, never `DataUnavailable`. For offline diagnosis, inspect the
+exact admitted app/release pair and authorized COG chunks; an unwarmed location
+or layer need not work offline. PMTiles remains network-only.
 
-- code revision, `dataReleaseId`, source snapshot hashes, and build environment;
-- scientific golden-point and release-to-release diff results;
-- schema, STAC, GeoParquet, PMTiles, COG, licence, and checksum results;
-- application bundle sizes and browser performance results;
-- search corpus counts, duplicates, exclusions, index bytes, and ranking tests;
-- storage bytes and estimated range-request/transfer cost;
-- SLSA-compatible provenance and Cosign verification result;
-- the prior verified application/release rollback pair.
+Update/retention failures retain their own retryable technical state. Do not
+force activation or delete stores used by live/unknown clients. Application
+rollback requires a verified deployment; source recovery uses Git history.
 
-Publication stops if any required result is missing. “CI passed” without this
-versioned evidence is insufficient for a scientific data release.
+Runbooks retain the detailed protocols:
 
-## Production synthetics
+- [Atlas development](../operations/coastal-atlas-development.md) and
+  [local adapter](../operations/coastal-atlas-real-local-adapter.md)
+- [Static scientific lookup](../operations/static-scientific-lookup.md)
+- [Offline client lifecycle](../operations/static-offline-client-lifecycle.md)
+- [Production browser retention](../operations/production-browser-retention.md)
+- [Offline release builder](../operations/offline-release-builder.md)
+- [Public readback](../operations/phase-1-public-readback.md)
 
-Run lightweight probes from at least two European regions after deployment and
-on a schedule:
+## Reading performance evidence
 
-1. Fetch the HTML shell and verify the expected commit/release marker.
-2. Fetch `manifest.json`, validate its schema, and verify exactly nine layers.
-3. `HEAD` a search index, PMTiles archive, and analysis COG; verify content
-   length, ETag, media type, cache headers, and range support.
-4. Request representative beginning, middle, and ending byte ranges and verify
-   `206 Partial Content` plus `Content-Range`.
-5. Run a browser flow: local search, select, assess, switch scenario/horizon,
-   share URL, and reload.
-6. Assert that no request targets `/assess`, `/geocode`, `/config`, a database,
-   or a tile server.
-7. Warm the core cache, disable the network, and repeat the explicitly supported
-   offline flow.
-8. Verify that an uncached layer fails honestly rather than returning a guessed
-   result.
+A report must identify edition, build/release, browser/tool profile and cold/warm
+conditions. Fixture success does not validate local CoCliCo sources; source
+hashes do not validate scientific meaning or public delivery.
 
-OpenFreeMap is probed separately. Its failure is a degraded basemap state, not
-an assessment outage.
+The Lighthouse evaluator accepts raw 90+ results without any waiver. The current
+runner selects the separate private-local-demo exception, valid until
+2026-10-16 00:00 Europe/Berlin, only if accepting lower performance needs it.
+It records 54/56/54 fixture performance and retains a 50 floor, 90 in the other
+categories and zero render errors. That exception is not public/MVP or
+scientific qualification. The expired September adoption policy is historical;
+see [15](15-performance-and-scalability.md).
 
-## Platform metrics
+## Future public operations
 
-Use Cloudflare's aggregate platform metrics for:
-
-- static-site and R2 request volume, response status, latency, and cache ratio;
-- R2 stored bytes, Class A/Class B operations, and public transfer;
-- errors by application or data origin;
-- usage relative to dated free-tier and budget assumptions;
-- suspicious request-rate or range-request patterns.
-
-Alerts should trigger on sustained synthetic failure, unexpected 4xx/5xx
-changes, missing range support, rapid storage/operation growth, and projected
-budget breach. Traffic spikes alone are context, not proof of an incident.
-
-## Browser errors and privacy
-
-The baseline does not require real-user analytics or client error reporting.
-CI browser runs and synthetics provide the first line of evidence.
-
-If client reporting is added later, it must be privacy-reviewed and scrub:
-
-- search text and settlement selection;
-- latitude/longitude and map bounds;
-- full URLs, fragments, and query parameters;
-- local-storage, IndexedDB, and cache contents;
-- stable user/device identifiers.
-
-Prefer aggregate Web Vitals and coarse browser/version counts. Sampling,
-retention, processor, purpose, and user opt-out must be documented. A telemetry
-provider may not become required for search or assessment.
-
-## Runbooks
-
-### Site or manifest unavailable
-
-1. Confirm the failure from multiple regions and separate DNS, static origin,
-   and data origin.
-2. Check the last deployment and provider status.
-3. If a deploy caused the issue, redeploy the previous known-good application.
-4. Verify the prior manifest and browser flow before resolving the alert.
-
-### Range requests or CORS fail
-
-1. Reproduce with public `HEAD` and partial `GET` requests.
-2. Compare OpenTofu plan/state and current bucket/domain rules.
-3. Restore the last reviewed CORS/cache configuration.
-4. Re-run PMTiles/COG range probes and a real browser assessment.
-
-### Scientific or data-quality defect
-
-1. Stop further publication and identify affected release IDs from manifests.
-2. Redeploy the previous application/release pair.
-3. Keep the defective immutable release for investigation unless security or
-   legal requirements require removal.
-4. Correct the pipeline, rerun the full validation set, and publish a new
-   release ID; never repair released objects in place.
-5. Publish a concise impact note if users could have seen incorrect results.
-
-### Unexpected cost growth
-
-1. Compare storage growth, request count, range size, and cache ratio to the
-   release cost model.
-2. Check automated abuse and accidental whole-object downloads.
-3. Improve caching/range locality or temporarily constrain abusive traffic at
-   the edge without changing scientific behaviour.
-4. Create an ADR before adding paid always-on compute or proprietary data
-   services.
-
-### Compromised publication path
-
-1. Revoke the credential and freeze production publication.
-2. Audit DNS, bucket configuration, static deployments, and object inventory.
-3. Verify manifests, signatures, and hashes from a trusted checkout.
-4. Restore a verified pair and rotate least-privilege credentials.
-5. Record affected releases and remediation in the incident report.
-
-## Rollback readiness
-
-At all times the release inventory identifies:
-
-- current and previous application commit;
-- corresponding `dataReleaseId` values;
-- deployable static build or reproducible build reference;
-- public manifest/provenance URLs;
-- last successful smoke-test time.
-
-Rollback means redeploying an immutable pair, not editing data. Test the
-procedure before decommissioning the old architecture and periodically after
-hosting/IaC changes.
-
-## Ownership and review cadence
-
-The project owner owns release approval, incident severity, and cost decisions.
-Automation owns deterministic gates but cannot waive them. Review:
-
-- on every release: all scientific, contract, delivery, performance, and cost
-  evidence;
-- weekly while actively developing: failing synthetics and usage anomalies;
-- monthly in production: dependency alerts, provider cost assumptions, access
-  credentials, and rollback freshness;
-- on every source or methodology change: licence, attribution, golden points,
-  and scientific review.
-
-The observability system is successful when it provides enough evidence to
-publish or roll back confidently without creating a new runtime platform to
-observe.
+Before a public data deployment, define operator ownership, exact release
+qualification, delivery probes, response headers, cost assumptions and recovery
+procedures against the chosen host. These remain delivery work. Existing local
+and controlled-build tools provide evidence inputs, not an already operating
+monitoring platform.
