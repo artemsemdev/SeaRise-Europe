@@ -1,370 +1,189 @@
-# 04 — Browser Runtime Sequences
+# 04 — Runtime Sequences
 
-> **Status:** Accepted target architecture
-> **Decisions:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md) and [ADR-026 — Authoritative Browser Range Persistence](adr/ADR-026-authoritative-browser-range-persistence.md)
+> **Status:** Implemented flows, reviewed 2026-10-04.
+> Atlas and AR6 sequences have different data and persistence authorities.
 
-All sequences below run without an application API, runtime database,
-geocoding service, or tile server. `CDN` represents static assets and immutable
-release objects delivered through HTTPS.
-
-## 1. Application bootstrap
+## Atlas bootstrap
 
 ```mermaid
 sequenceDiagram
-    actor U as Visitor
-    participant B as Browser app
-    participant C as Browser cache
-    participant CDN as Static host / artifact CDN
-    participant M as MapLibre
-
-    U->>CDN: GET /
-    CDN-->>U: Static HTML, CSS, initial JavaScript
-    B->>C: Read pinned manifest
-    alt Cached and release ID matches
-        C-->>B: Manifest
-    else Cache miss
-        B->>CDN: GET releases/{id}/manifest.json
-        CDN-->>B: Immutable manifest
-        B->>C: Cache under release-scoped key
-    end
-    B->>B: Validate schema and release identity
-    B-->>U: Enable controls with SSP2-4.5 / 2050 defaults
-    B->>M: Lazy initialize map
-    B->>B: Register service worker after interactivity
+    participant V as Vite/build mode
+    participant E as Atlas entry
+    participant UI as AtlasApp
+    participant D as AtlasDataSource
+    participant M as EuropeMap
+    V->>E: Explicit fixture or real-local edition
+    E->>D: Create one provider
+    E->>UI: Inject provider
+    UI->>D: getCatalog(signal)
+    D-->>UI: Strict six-layer catalog or technical error
+    UI->>UI: Restore URL view and load selected place
+    UI->>UI: Give controls a paint opportunity
+    UI->>M: Lazy map mount after two animation frames
+    M->>D: getTile(selected year, defenses, z/x/y, signal)
+    D-->>M: PNG + valid/flood counts
 ```
 
-The initial path does not load all search and layer data. A corrupt manifest,
-missing required artifact, or wrong release ID produces a recoverable technical
-error and disables assessment.
+The normal provider reads authored browser data. The real-local provider sends
+GET requests to `/atlas-data`. Edition never depends on service availability.
+Catalog failure has an explicit retry; failure does not mount another edition.
+No atlas service-worker registration or release-manifest bootstrap occurs.
 
-## 2. Settlement search
+## Real-local startup and request processing
 
 ```mermaid
 sequenceDiagram
-    actor U as Visitor
-    participant UI as Search UI
-    participant W as Search Web Worker
-    participant C as Browser cache
-    participant CDN as Artifact CDN
-
-    U->>UI: Focus search
-    UI->>W: initialize(release, core, coastal)
-    W->>C: Read and verify receipt-last completion marker
-    W->>C: Read core index
-    alt Core index cached
-        C-->>W: Compressed core index
-    else Core index absent
-        C->>CDN: GET europe-core.codepoint-trie.json.br
-        CDN-->>C: Immutable index
-        C-->>W: Compressed core index
-    end
-    W->>W: Deserialize index
-    W-->>UI: ready(core)
-    U->>UI: Type settlement name
-    UI->>W: query(token, text)
-    W->>W: Normalize and rank locally
-    W-->>UI: results(token, places)
-    UI-->>U: Names with admin and country context
-    par Coastal shard loads opportunistically
-        W->>C: Read/fetch coastal index
-        W->>W: Merge without changing ranking contract
-        W-->>UI: ready(coastal)
-    end
+    participant O as Operator
+    participant N as Node adapter
+    participant P as Python raster process
+    participant F as Provisioned files
+    participant B as Browser
+    O->>N: Start explicit real-local dev/preview
+    N->>F: Validate catalog and verify place-index bytes
+    N->>P: Spawn on loopback port 0
+    P->>F: Verify unique raster size/digest identities
+    P-->>N: Ready with assigned port
+    N-->>B: Serve sanitized catalog/search/basemap
+    B->>N: GET inspect(lon, lat, defenses)
+    N->>P: Proxy bounded request
+    P->>F: Read native cell for each supported year
+    P-->>B: Three point results through proxy
 ```
 
-The UI applies only the response carrying the current query token. Search text
-and coordinates never leave the browser for project-controlled infrastructure.
-No address-level search is promised.
+Startup errors stop activation. Tile requests take the same proxy path but warp
+rasters into display PNGs. Raster-read failure becomes an HTTP/technical error;
+no valid sample is the distinct successful `unknown` value. All private atlas
+and basemap responses are `no-store`. Closing the local server closes its owned
+child; the demo lifecycle also reaps children interrupted before readiness.
 
-## 3. Select and assess a coastal location
+## Atlas interaction and stale work
+
+`CitySearch` debounces and aborts superseded queries. Selecting a place updates
+view state and point inspection; clicking the map chooses a point.
+`PointInspection` validates exact point/defense correspondence and keys data by
+provider and request. Aborted work cannot replace current values.
+
+Changing year or defenses replaces the map layer generation. Late tile
+completions cannot update the new generation's counts/errors. Inspection returns
+all years for a defense setting, so the displayed year selects from that result.
+Comparison switches between 2030 and 2100 at the same view; timeline playback
+steps discrete years without interpolation.
+
+The app writes current state with `history.replaceState` and restores it on
+`popstate`. Share copies that URL, with a fallback when clipboard access fails.
+It restores a view against the chosen provider; atlas URLs do not pin a data
+release or choose the edition.
+
+## Sealed local demo sequence
+
+[`demo.mjs`](../../scripts/demo/demo.mjs) adds a reproducible local handoff:
+
+1. `demo:preflight` checks explicit input paths, toolchain and local adapter
+   startup, then closes it and rechecks metadata identities.
+2. `demo:prepare` requires clean exact source, builds real-local assets, records
+   app hashes plus six external metadata identities, verifies the candidate and
+   marks its files/directories read-only. Existing output is never overwritten.
+3. `demo:serve` requires the same clean commit and matching app/data identities,
+   starts the adapter and serves the sealed app on loopback with config/env
+   discovery disabled. It rechecks identities after startup.
+4. Shutdown closes preview and reaps native children, including interrupted
+   startup. Candidate rollback means using its matching source and data.
+
+The record explicitly sets `publicPromotionAuthorized=false` and
+`mvpRelease=false`. Preparing/serving does not publish data or create a stable
+MVP release.
+
+## Projection bootstrap and search
+
+The retained [`main.tsx`](../../src/web/src/main.tsx) renders `App` and registers
+the projection worker after interactivity. Release bootstrap reads the pinned
+browser v2 manifest (or explicit private binding), validates identity/disposition
+and the exact dataset matrix, then creates `ReleaseContext`. Malformed data is
+a technical startup error, not a substituted release.
+
+Search initializes lazily on focus/idle, verifies core shard bytes before
+JSON/Brotli decoding and queries a Worker. Coastal results become available
+separately; merging is core-first with ID deduplication. Search completion is
+not assessment. Only explicit selection hands an immutable `Selection` to the
+controller. Query tokens, client generation, query key and release identity
+reject obsolete responses.
+
+## Projection assessment and control changes
 
 ```mermaid
 sequenceDiagram
     actor U as Visitor
-    participant UI as React application
+    participant C as AssessmentController
+    participant E as AssessmentEngine
     participant G as Geography classifier
-    participant A as Analysis artifact reader
-    participant C as Browser cache
-    participant CDN as Artifact CDN
-    participant Map as MapLibre / PMTiles
-
-    U->>UI: Select settlement
-    UI->>UI: Freeze selection + evaluation token
-    UI->>G: classify(coordinate, release geometry)
-    G-->>UI: InEuropeAndCoastalZone
-    UI->>A: lookupNearestProjection(layer, coordinate)
-    A->>C: Read required COG range
-    alt Range cached
-        C-->>A: Bytes
-    else Range absent
-        C->>CDN: Range GET analysis artifact
-        CDN-->>C: 206 Partial Content
-        C-->>A: Bytes
+    participant R as COG reader / verified resource router
+    participant UI as Accepted projection UI
+    U->>C: Select location/scenario/horizon
+    C->>C: Freeze selection, advance operation, cancel stale work
+    C->>E: evaluate(selection, signal)
+    E->>G: Classify support then coastal scope
+    alt Outside support or scope
+        G-->>E: UnsupportedGeography or OutOfScope path
+    else Supported coastal point
+        E->>R: Read nearest native location's exact quantiles
+        R-->>E: Available triplet or source-unavailable reason
     end
-    A-->>UI: Required quantiles + source identity, or unavailable reason
-    UI->>UI: Map lookup to one of four result states
-    UI->>Map: Set marker + matching PMTiles layer + legend
-    Map->>CDN: Range GET missing visual tile data
-    UI-->>U: Result + methodology + data release
+    E-->>C: Evaluation or technical failure
+    C->>C: Check operation, selection key and release
+    C->>UI: Atomically accept matching result tuple
 ```
 
-The analysis values come from the nearest native AR6 grid location within
-100 km. They are never interpolated or derived from rendered colour. Result,
-layer, and legend share the same release/scenario/horizon identity.
+The COG reader uses verified range access; rendering PMTiles does not supply the
+scientific value. A nearest location beyond 100 km or source nodata yields
+`DataUnavailable`; a missing/corrupt range is a technical failure. See
+[13](13-domain-model.md) for the exhaustive mapping.
 
-The implemented adapters are `StaticGeographyClassifier` and
-`CogAnalysisArtifactReader`. The classifier verifies the release-bound support
-and coastal GeoParquet bytes before decoding them. The COG reader requires an
-HTTP `206` response for every range, validates the declared native grid and
-three-band contract, and reads the selected pixel with no resampling option.
-`AssessmentEngine` owns cancellation, monotonic evaluation tokens, and the
-exhaustive result mapping. See the
-[static scientific lookup runbook](../operations/static-scientific-lookup.md).
+When controls change, a previous accepted result keeps its original selection
+while the new one evaluates. Result, marker, layer, legend and accepted URL
+never combine pending controls with an old result. Abort reduces work; identity
+guards preserve correctness even if cancellation arrives too late.
 
-## 4. Scope short-circuits
+## Projection offline, update and retention
 
-```mermaid
-sequenceDiagram
-    actor U as Visitor
-    participant UI as Browser app
-    participant G as Geography classifier
-    participant A as Analysis artifact reader
+A warmed projection document can reload from its sealed shell. Verified whole
+resources and authorized COG chunks support only the flows actually admitted.
+An uncached layer produces `connection-required` and retains the prior accepted
+tuple; it does not fabricate a domain outcome. PMTiles remains network-only.
+The root-scoped worker passes atlas requests through and does not precache
+atlas or architecture documents.
 
-    U->>UI: Select location
-    UI->>G: classify(coordinate)
-    alt Outside Europe support geometry
-        G-->>UI: OutsideEurope
-        UI-->>U: UnsupportedGeography
-    else In Europe, outside coastal zone
-        G-->>UI: InEuropeOutsideCoastalZone
-        UI-->>U: OutOfScope
-    else In supported coastal zone
-        G-->>UI: InEuropeAndCoastalZone
-        UI->>A: Read selected projection values
-        A-->>UI: Continue projection lookup
-    end
-```
+The update coordinator verifies a waiting worker's exact build-sealed identity;
+only sealed evidence can produce a confirmation token. New preparation revokes
+the prior generation. Confirmation writes a non-consumable `PENDING` intent,
+then arms that exact intent in a separate durable transaction. Only `ARMED` can
+be consumed once. Stale, missing, mismatched, tombstoned and replayed intents
+fail closed.
 
-`UnsupportedGeography` and `OutOfScope` are successful domain outcomes. They do
-not trigger retries and do not read a projection layer.
+Confirmation instructs the user to close all SeaRise tabs and reopen. It does
+not call `skipWaiting`, `clients.claim`, navigate or swap active authority. On
+fresh boot, the page challenges its actual controller and reconciles exact
+app/release/precache plus admitted resource-plan/receipt identity before
+consuming the intent. A changed controller on the same page is not fresh boot.
 
-## 5. Result-state mapping
+Durable mutations use an exclusive guard with bounded abort-aware operations;
+concurrent/reentrant mutations return `mutation-busy`. A stalled adapter remains
+a technical state. Rollback tombstones intent before reporting
+`deployment-required`; browser storage cannot perform deployment rollback.
 
-After coordinate and scope validation, the browser uses the following
-exhaustive mapping:
+Retention then considers only eligible `cleanup-pending` older pairs. Exact-pair
+locks, leases and controlling-worker client census block deletion for active,
+unknown or unresponsive clients. The active and immediately previous complete
+pairs remain. Cleanup fences preserve safety across partial failure/retry;
+private candidate sessions do not enter production retention.
 
-| Condition | Result |
-|---|---|
-| Outside Europe support geometry | `UnsupportedGeography` |
-| Inside Europe, outside coastal analysis zone | `OutOfScope` |
-| Coastal coordinate; nearest grid location exceeds 100 km | `DataUnavailable/source-location-too-distant` |
-| Coastal coordinate; any required source quantile is nodata | `DataUnavailable/source-value-nodata` |
-| Coastal coordinate; q0.167, q0.5, and q0.833 are available | `ProjectionAvailable` |
+The protocol details and implementation links are in
+[offline lifecycle](../operations/static-offline-client-lifecycle.md),
+[production retention](../operations/production-browser-retention.md), and
+[`offline/`](../../src/web/src/offline/).
 
-An HTTP failure, corrupt byte range, invalid manifest, unsupported browser, or
-missing uncached resource is a technical error. It must not be mapped to
-`DataUnavailable`.
+## Methodology and architecture access
 
-## 6. Scenario or horizon change
-
-```mermaid
-sequenceDiagram
-    actor U as Visitor
-    participant UI as Browser app
-    participant A as Assessment engine
-    participant Map as Map renderer
-
-    Note over UI: Result R1 matches selection S1
-    U->>UI: Change scenario or horizon to S2
-    UI->>UI: Abort outstanding reads; increment token
-    UI-->>U: Keep R1 visibly labelled as updating
-    UI->>A: assess(S2, token 2)
-    A-->>UI: Result R2, token 2
-    UI->>UI: Confirm token and selection still current
-    UI->>Map: Apply S2 overlay + marker + legend atomically
-    UI-->>U: Display R2
-```
-
-The geography classification may be reused for an unchanged coordinate, but
-the selected layer and exact pixel lookup are reevaluated. There is no fallback
-to a different scenario, horizon, methodology, or release.
-
-## 7. Rapid changes and stale work
-
-```mermaid
-sequenceDiagram
-    actor U as Visitor
-    participant UI as Browser app
-    participant A as Assessment engine
-
-    U->>UI: Choose 2030
-    UI->>A: assess(S1, token 1)
-    U->>UI: Immediately choose 2050
-    UI->>A: abort token 1
-    UI->>A: assess(S2, token 2)
-    A-->>UI: Completion for token 1
-    UI->>UI: Ignore stale completion
-    A-->>UI: Completion for token 2
-    UI->>UI: Token and selection match
-    UI-->>U: Render only S2
-```
-
-This guard applies equally to search results, map clicks, artifact reads, and
-control changes. Abort signals reduce wasted work; tokens preserve correctness
-when cancellation is too late.
-
-## 8. Map refinement
-
-A map click after a location is selected creates a new `Selection` with the
-clicked coordinate and current scenario/horizon/release. It follows the same
-geography and assessment path as a settlement selection. The marker may move
-immediately, but a prior result must remain visibly associated with its prior
-coordinate until the new evaluation succeeds.
-
-## 9. Cached offline flow
-
-```mermaid
-sequenceDiagram
-    actor U as Visitor
-    participant UI as Browser app
-    participant SW as Service worker / caches
-
-    Note over SW: Complete resources cached; required authorized COG chunks in IndexedDB
-    U->>UI: Reopen site without network
-    UI->>SW: Request core resources
-    SW-->>UI: Release-matched cached resources
-    U->>UI: Search and select cached location/layer
-    UI->>SW: Request analysis COG range
-    SW-->>UI: Verified single-chunk slice
-    UI-->>U: Complete result marked available offline
-```
-
-The offline label describes resources actually cached, not the entire Europe
-dataset.
-
-## 10. Uncached data while offline
-
-```mermaid
-sequenceDiagram
-    actor U as Visitor
-    participant UI as Browser app
-    participant SW as Service worker / caches
-
-    U->>UI: Select scenario/location needing an uncached range
-    UI->>SW: Request analysis range
-    SW-->>UI: Cache miss; network unavailable
-    UI-->>U: Explain that this data needs a connection
-```
-
-The app keeps the last valid result, if any, clearly labelled. It does not
-display a new domain result for the uncached selection.
-
-## 11. Release update and rollback
-
-An active session remains pinned to one release. A newer deployment may notify
-the visitor that an update is available, but it does not mix manifests,
-indexes, geometries, or byte ranges. An ordinary reload does not activate the
-new app/release pairing while any tab remains controlled by the prior worker.
-Every SeaRise tab must close first, allowing natural service-worker activation; only
-the subsequent reopen initializes the new pairing in a new cache namespace.
-Rollback deploys the previous complete pair; immutable artifacts are never
-overwritten.
-
-The static-host update coordinator is a pure user-intent state machine over
-injected ports. A waiting worker can prove only its build-sealed exact
-app/release pair and shell precache hash; it cannot claim a runtime resource
-plan or admission receipt before it controls a page. Inspection can report
-only `sealed`, `incomplete`, `corrupt`, `mixed`, or `stale`; only a sealed
-waiting install identity can produce a confirmation token. Runtime
-resource-plan and receipt authority is recorded later, from exact active-pair
-admission after natural activation.
-
-Starting newer preparation synchronously enters `preparing` and revokes the
-prior pending confirmation before the first asynchronous port call. The
-coordinator wraps the provider token in its own monotonic, one-time generation,
-so provider reuse or collision cannot authorize a later intent and a consumed
-confirmation cannot be replayed. Each production coordinator mints its own
-instance identifier from browser cryptographic entropy; deterministic injection
-exists only as a test seam, and duplicate identifiers are rejected within one
-JavaScript realm. Two coordinators created during the same page boot therefore
-cannot mint the same transition identity. The first validated controller proof
-is pinned as that coordinator's immutable launch boot.
-
-Explicit confirmation first records a non-consumable `PENDING` transition
-intent. Only after that write resolves unambiguously and the same coordinator
-generation remains current may a second durable transaction change the exact
-intent to `ARMED`. That arm transaction remains bound to an abort signal until
-commit. Only an exact `ARMED` intent can be consumed once; `PENDING`, consumed,
-missing, mismatched, tombstoned, and unknown records fail closed. The
-coordinator then presents the exact instruction: `Update ready. Close all
-SeaRise tabs and reopen to use it.` It does not swap browser-storage authority,
-activate a worker, call
-`skipWaiting`, call `clients.claim`, navigate, reload, or claim that the new
-pair is current. Existing tabs remain pinned to their controlling worker. A
-verified waiting worker becomes eligible to activate naturally only after all
-clients of the prior worker close. Cancellation or an ambiguous first write can
-leave only harmless `PENDING` evidence. Conditional cleanup may remove that
-exact pending record, but cleanup failure can never make it consumable.
-
-All durable intent mutations share a non-reentrant exclusive guard. The
-`PENDING` to `ARMED` transaction is the publication linearization point. A
-concurrent or adapter-reentrant mutation returns immediate, recoverable
-`mutation-busy` instead of queueing behind the port callback; the caller may
-retry after publication settles. After a compliant delayed arm settles, a
-retried rollback atomically tombstones the exact
-intent whether it is `PENDING` or `ARMED`; tombstoned transition IDs can never
-arm or consume. Only after that tombstone commits may rollback publish
-`deployment-required`. If tombstoning fails, the coordinator instead reports
-`rollback-failed` with the preserved durable intent and its `pending` or
-`armed` state. It never claims completed rollback while durable update
-authority remains.
-
-Durable adapter methods are non-reentrant and receive a bounded deadline plus
-an `AbortSignal`. They must keep their transaction bound to the signal and
-settle promptly after abort. The coordinator does not release its exclusive
-guard until the adapter acknowledges settlement. If the deadline expires and
-the adapter never settles, state becomes fail-closed `adapter-stalled`; later
-mutations return immediately with that technical state instead of waiting or
-claiming a durable outcome.
-
-On the subsequent fresh boot, activation is recognized only after exact active
-resources are admitted and the page challenges
-`navigator.serviceWorker.controller` directly. The controller-reported pair
-and precache must match the router's current pair and the newly recorded
-resource-plan/receipt authority before the matching one-shot intent is consumed.
-`registration.active` and a cached precache value are not controller proof.
-Malformed JSON, unknown durable states, wrong shapes, same-page,
-mismatched-controller, stale-intent, missing-intent, pending-intent, and replay
-attempts fail closed; malformed records are removed and controller mismatches
-are tombstoned under the update Web Lock. A changed controller proof reported
-to the original coordinator is still the same page, not a fresh boot, and
-cannot finalize activation. Async completion from a cancelled generation
-cannot overwrite a newer operation.
-Candidate evidence failures remain distinct from technical controller,
-inspection-port, token-provider, and intent-store failures. All are technical
-update states, never scientific outcomes.
-
-After that exact fresh-boot reconciliation, production retention inventories
-only lifecycle records already marked `cleanup-pending`. The lifecycle store
-acquires an exact-pair admission Web Lock and asks the current controlling
-worker for a stable client census. Active, unknown, or unresponsive clients,
-unexpired stored leases, corrupt authority, and incomplete active/previous
-records block deletion. The active complete pair and immediately previous
-complete recoverable pair are never cleanup targets. Eligible older pairs are
-removed in receipt/lease, Cache Storage, range-record, then lifecycle order;
-the durable cleanup fence prevents stale admission throughout partial failure
-and retry. The coordinator exposes retryable technical retention state without
-creating a scientific outcome. See the
-[production browser retention runbook](../operations/production-browser-retention.md).
-
-Browser storage is not application rollback authority. Rollback requires a
-verified static deployment, using repository Git history when source recovery
-is needed. The browser coordinator reports `deployment-required` and keeps the
-current controller usable; it never claims a local application rollback.
-
-## 12. Architecture and methodology access
-
-Opening methodology uses already loaded release metadata or a small immutable
-JSON file. Opening `/about/architecture` loads only the evidence needed for the
-page; large GeoParquet and geospatial artifacts are linked for inspection, not
-downloaded automatically. Neither flow depends on a live server-side report.
+Atlas opens its edition-aware `AboutDialog`; projection methodology loads
+release-backed content. `/about/architecture/` lazily renders projection build
+identity and status copy. It does not fetch/display a complete live performance,
+cost, STAC or signature report. Neither page is a report-generation server.

@@ -1,36 +1,43 @@
 # Architecture Decision Register
 
 > **Status:** Current
-> **Last reviewed:** 2026-08-16
+> **Last reviewed:** 2026-10-04
 
-This register contains only decisions that remain active in the accepted target
-architecture. [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md)
-is the authoritative architecture decision and resolves conflicts with earlier
-records. Superseded implementation choices remain available in Git history,
-not as active guidance in this document.
+This register records decision scope, not deployment status. The implemented
+source and contracts determine current behavior. [ADR-028](adr/ADR-028-coastal-atlas-adoption.md)
+governs the main coastal atlas and its explicit loopback adapter. ADR-021,
+ADR-024 and ADR-026 govern the retained projection reference and its release
+contracts; their no-runtime-service rule is not a description of real-local atlas.
 
-## Active decisions
+## Atlas and repository decisions
+
+| ID | Decision | Current implementation |
+|---|---|---|
+| [ADR-028](adr/ADR-028-coastal-atlas-adoption.md) | Adopt the coastal atlas as the main app | `/` has explicit fixture/real-local providers, six depth layers and a local raster adapter; `/projections/` retains AR6. Private demo tooling seals app/source/data identities without public/MVP approval. |
+| [ADR-027](adr/ADR-027-post-cutover-application-evolution.md) | Allow evolution after completed repository removal | `validate_post_cutover.py` preserves historical authority and removed-path absence; local evidence-only checks differ from live CI owner verification. |
+
+## Retained projection and earlier decisions
 
 | ID | Decision | Status | Current interpretation |
 |---|---|---|---|
-| ADR-002 | Keep client state minimal | Accepted | Use React local state by default; Zustand only for genuinely shared state. Immutable files are not a reason to add a server-state cache. |
+| ADR-002 | Keep client state minimal | Accepted | React local state is implemented; Zustand and server-state query libraries are not current dependencies. |
 | ADR-010 | Model five domain result states | Superseded by ADR-024 | The projection product uses `ProjectionAvailable`, `DataUnavailable`, `OutOfScope`, and `UnsupportedGeography`; the two binary exposure states remain historical. |
 | ADR-014 | Keep explorer state in the URL | Accepted, amended | Browser URL APIs carry location, scenario, horizon, and pinned release; there is no dependency on Next.js routing. |
 | ADR-015 | Use binary exposure methodology v1.0 | Superseded by ADR-023 and ADR-024 | The direct AR6-change versus DEM comparison is prohibited; the target product reports AR6 projections without classifying terrain. |
 | ADR-016 | Support three SSP scenarios | Accepted | `ssp1-26`, `ssp2-45`, and `ssp5-85`. |
 | ADR-017 | Default to SSP2-4.5 / 2050 | Accepted | Defaults remain `ssp2-45` and `2050`; the URL makes them explicit when shared. |
 | ADR-018 | Use a 25 km coastal analysis zone | Accepted, amended by ADR-024 | The versioned Natural Earth-derived zone defines product scope only; it is not a flood-reach or exposure boundary. |
-| ADR-021 | Adopt static-first offline geospatial architecture | **Accepted; product contract amended by ADR-024** | Offline build plane, immutable open artifacts, React/Vite browser runtime, local search/lookup, Cloudflare Static Assets + R2, and no runtime API/database/tile server. |
+| ADR-021 | Adopt static-first offline geospatial architecture | **Accepted; product contract amended by ADR-024** | Implemented offline artifacts and static projection browser with local search/lookup. Cloudflare Static Assets + R2 is a reference direction, not checked-in deployed infrastructure; ADR-028 separately allows the atlas loopback adapter. |
 | ADR-023 | Use an uncertainty-aware EGM2008 mean-water baseline | Superseded for publication by ADR-024 | Historical acquisition and no-go evidence is retained; its terrain-classification path cannot produce a release. |
 | ADR-024 | Report AR6 regional relative sea-level projections | **Accepted; recovery gate approved** | Use one source-native 1° grid for map and point lookup, report q0.167/q0.5/q0.833 relative to 1995–2014, and never classify flooding or terrain exposure. Trusted #110 evidence and the owner disposition opened Phase 1. |
-| ADR-025 | Accelerate repository cutover to the static runtime | **Accepted** | Phase 2 removes the superseded repository runtime after target coverage exists. Git history is the source rollback; external cloud cleanup still requires separate explicit approval. |
+| ADR-025 | Accelerate repository cutover to the static runtime | **Accepted** | The superseded repository runtime has been removed; ADR-027 protects its completed authority. Git history is the source rollback; external cloud cleanup still requires separate explicit approval. |
 | ADR-026 | Use authoritative browser range persistence | **Accepted** | Cache Storage holds only verified complete resources; bounded IndexedDB holds only release-authorized COG chunks. PMTiles remains network-only, visual-only, and `no-store` until a separate reviewed interval-digest promotion contract exists. |
 
 ## Historical safety-gate decision
 
 | ID | Decision | Status | Current interpretation |
 |---|---|---|---|
-| ADR-022 | Stop publication at the Phase 0 source/geography gate | Superseded for publication by ADR-024 | Its fail-closed terrain/datum evidence remains immutable, but terrain reconciliation and independent scientific review are not inputs to the AR6 projection product. |
+| ADR-022 | Stop publication at the Phase 0 source/geography gate | Proposed historical gate; publication superseded by ADR-024 | Its fail-closed terrain/datum evidence remains immutable, but terrain reconciliation and independent scientific review are not inputs to the AR6 projection product. |
 
 ## Decisions superseded by ADR-021
 
@@ -41,7 +48,7 @@ ADR-021 replaces the active use of these choices:
 | ADR-001 | Next.js App Router and server runtime | Static React 19 + TypeScript application built with Vite 8 |
 | ADR-003 | TanStack Query for runtime API/server state | Direct immutable artifact loading with browser/Service Worker caches |
 | ADR-004 | ASP.NET Core application API | Deterministic in-browser assessment over published artifacts |
-| ADR-005, ADR-008 | Runtime PostgreSQL/PostGIS | DuckDB Spatial in the offline build plane; no production database |
+| ADR-005, ADR-008 | Runtime PostgreSQL/PostGIS | DuckDB Spatial in the offline build plane; no projection runtime database |
 | ADR-006 | TiTiler runtime tile service | PMTiles/CDN delivery plus analysis-grade COG lookup |
 | ADR-007 | COG as the only raster delivery representation | COG for exact analysis and PMTiles for visual map delivery until bit-exact consolidation is proven |
 | ADR-009 | Anonymous API and rate limiting | Anonymous static application with CDN/object-storage abuse controls only |
@@ -52,14 +59,14 @@ ADR-021 replaces the active use of these choices:
 | ADR-020 | Azure Maps basemap | MapLibre with OpenFreeMap as non-authoritative visual context |
 
 These rows do not authorize keeping the old services in the target state.
-ADR-025 amends the ADR-021 sequence: their repository implementation is removed
-during Phase 2 after equivalent-or-stronger static coverage exists.
+ADR-025 amended the ADR-021 sequence: those repository implementations were
+removed during Phase 2 after equivalent-or-stronger static coverage existed.
 
 ## Decision rules
 
 A new ADR is required before introducing any of the following:
 
-- a runtime API, edge business logic, database, queue, or tile server;
+- a new public runtime API, edge business logic, database, queue, or tile server beyond the explicit local atlas boundary in ADR-028;
 - user accounts, user-generated content, authentication, or server-side state;
 - paid exact-address geocoding or collection of user search/coordinate data;
 - a change to supported scenarios, horizons, defaults, domain states, coastal
@@ -71,9 +78,9 @@ A new ADR is required before introducing any of the following:
 - persistence of PMTiles ranges without a separately reviewed promotion
   contract containing exact release-authorized interval digests.
 
-Implementation details that stay inside ADR-021 constraints—such as choosing
-between measured open-source search libraries—may be recorded in a short design
-note and fitness tests rather than a new ADR.
+Implementation details within the applicable product decision may be recorded
+in design notes and tests. Projection search has already selected its codepoint
+trie; that is no longer an open library choice. Atlas local search is separate.
 
 ## ADR lifecycle
 

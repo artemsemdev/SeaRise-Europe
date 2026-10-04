@@ -1,216 +1,111 @@
 # 15 — Performance and Scalability
 
-> **Status:** Accepted target architecture; budgets require implementation measurements
-> **Source of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Status:** Implemented controls and measurement limits, reviewed 2026-10-04.
+> A limit in code is not evidence that a particular real-data deployment met it.
 
-## 1. Performance model
+## Separate runtime cost models
 
-The critical path contains no application server, geocoder, database, or tile
-server. Scalability comes from immutable files, CDN/object-storage byte-range
-delivery, and bounded browser work.
+| Mode | Critical work | Scaling limit |
+|---|---|---|
+| Atlas fixture | Browser UI, bounded grid sampling, PNG generation, MapLibre | Browser CPU/GPU and bundled assets; fixture does not model Europe-wide load |
+| Real-local atlas | Node search and file delivery; Python point/tile reads | Local index scan, disk/raster I/O, process memory and render concurrency |
+| AR6 reference | Worker search, geometry decode, COG ranges and PMTiles visuals | Artifact transfer, browser stores/memory, Worker and exact lookup |
+| Offline pipeline | Verified source processing and artifact construction | Build toolchain, disk, CPU, stage receipts and controlled input volume |
 
-```mermaid
-flowchart LR
-    Shell["Static app shell"] --> Ready["First useful UI"]
-    Ready --> Worker["Lazy search worker + core index"]
-    Worker --> Result["Ranked place results"]
-    Result --> Bounds["Local scope predicates"]
-    Bounds --> Range["Cached or remote COG/PMTiles ranges"]
-    Range --> Assessment["Local result state"]
-```
+Static-host scalability applies to the fixture and retained projection delivery.
+It does not describe the local raster service's capacity.
 
-This changes the scaling question from “how many API/database instances are
-needed?” to “how small are the initial assets, how local are the requested
-ranges, and how effectively are immutable bytes cached?”
+## Enforced build and quality controls
 
-## 2. Release budgets
+[`inspect-build.mjs`](../../src/web/scripts/inspect-build.mjs) computes each
+entry's initial JavaScript import graph and enforces a separate **250 KiB
+Brotli** ceiling for atlas and projection. Map/Worker chunks stay outside those
+initial graphs. Build finalization embeds initial CSS and deterministic
+Brotli/gzip sidecars. Atlas uses system fonts; projection documents preload
+their two initial Flight fonts.
 
-| Fitness function | Target |
-|---|---:|
-| Initial application JavaScript, Brotli | <= 250 KiB, excluding lazy map/search chunks |
-| Lighthouse performance/accessibility/best-practices/SEO | >= 90 each on the agreed mobile profile |
-| Search response p95 after worker initialization | < 50 ms |
-| Local assessment p95 after required data is cached | < 100 ms |
-| Search worker initialization on reference mobile hardware | < 1,000 ms |
-| Runtime application API calls | 0 calls to `/assess`, `/geocode`, or `/config` |
-| Scenario/horizon coverage | Exactly 9 complete, validated combinations |
-| PMTiles/COG delivery | Every large artifact passes `HEAD` and partial `GET` |
-| Manifest integrity | Schema-valid; every byte size and SHA-256 matches |
-| Offline core | Shell, config, boundaries, and loaded search index work after network removal |
+The [Lighthouse runner](../../tools/static-quality/run-lighthouse-gate.mjs)
+checks map health, then performs three isolated cold simulated-mobile audits of
+`/`. Its target is at least 90 in performance, accessibility, best practices
+and SEO for each run and their medians. It audits the atlas, not only the old
+projection landing experience.
 
-Budgets are CI gates, not current measurements. A dated performance report
-records browser, device/CPU, network profile, cold/warm cache, release ID, and
-artifact sizes. A waiver records the regression, rationale, owner, and expiry.
+[`evaluateLighthouseBudget`](../../src/web/scripts/lighthouse-budget.mjs)
+accepts raw passes before consulting any waiver. The current runner selects
+[the private-local-demo policy](../../tools/static-quality/atlas-local-demo-performance-waiver.json),
+which records fixture performance **54/56/54**, a floor of **50** each run,
+90+ in other categories and no render errors. It applies only to labeled
+synthetic-fixture evidence for the local demo, with explicit non-public/non-MVP
+flags and recorded owner approval. It expires **2026-10-16 00:00 Europe/Berlin**.
+The old September adoption policy is historical. Expired/invalid policies cannot
+excuse lower scores, while raw all-category passes need no exception.
 
-## 3. Initial-load strategy
+The [cold startup evidence](../evidence/release-candidate/cold-atlas-startup.md)
+records its exact source and Linux browser profile. It is prior evidence,
+not a fresh measurement from this documentation update or real-data/public
+qualification. The public 90-point target is unchanged.
 
-The first route delivers semantic HTML, critical CSS, and the smallest useful
-React bundle. It does not fetch scientific layers or the full settlement
-catalog before rendering.
+## Atlas implementation controls
 
-- split MapLibre/PMTiles, search, architecture-page, and optional analytics
-  code from the initial chunk;
-- load the map only when the explorer needs it;
-- initialize search on focus or browser idle in a Web Worker;
-- fetch `europe-core` before the larger `europe-coastal` shard;
-- keep methodology/config compact and pin them to `dataReleaseId`;
-- avoid decorative images and third-party scripts on the critical path;
-- use local component state by default and avoid a server-state framework for
-  immutable file reads.
+- `AtlasApp` waits two animation frames before mounting the lazy map so controls
+  can paint first; MapLibre uses a bundled same-origin worker and caps canvas
+  pixel ratio at 1.5.
+- `CitySearch` debounces and cancels obsolete provider requests; search returns
+  at most 12 places. Real-local search scans normalized aliases in Node memory
+  and sorts exact/prefix/substring matches, then population/name/ID.
+- Inspection returns all three years for one coordinate/defense request.
+- Map layer generations ignore stale tile status. Only the selected year and
+  defenses are drawn; comparison switches years at the same view.
+- Map zoom reaches 16, while flood tile zoom is capped at 13. Zoom cannot create
+  sub-cell scientific detail.
+- The raster HTTP listener queues up to **64** connections; this is distinct
+  from actual render concurrency.
+- Python bounds concurrent raster work with a semaphore of **4**, uses
+  single-threaded GDAL with a **64 MiB** cache setting, and retains at most
+  **256** tile results in its process-local LRU cache.
+- Display tiles are 256 × 256; overview selection and nearest-neighbor warping
+  reduce display work. Point inspection samples the original 25 m cell.
+- Atlas JSON/tiles are `no-store`; their reuse must not be modeled as a
+  persistent CDN/browser-cache optimization.
 
-Track compressed transfer, parsed JavaScript, main-thread execution, largest
-contentful paint, interaction responsiveness, and cumulative layout shift.
-Bundle size alone is not enough.
+Full source digests are computed during Python startup. Those checks can be
+expensive and must not be bypassed to make startup appear fast. The adapter's
+startup and raster-proxy timeouts are 30 seconds; this is a local behavior,
+not a latency SLA.
 
-## 4. Search performance
+Source anchors: [search](../../src/web/src/atlas/CitySearch.tsx),
+[local ranking](../../src/web/scripts/real-local-context.mjs),
+[map style limits](../../src/web/src/atlas/basemap-style.ts),
+[raster implementation](../../scripts/atlas/europe_raster_service.py).
 
-Search work never blocks the UI thread. The build performs normalization,
-alias expansion, coastal classification, and index serialization; the browser
-only loads and queries the resulting index.
+## Projection performance scope
 
-Performance controls:
+Projection Worker initialization, query performance and cached scientific lookup
+have retained targets of <1,000 ms, p95 <50 ms and p95 <100 ms respectively.
+Their evidence must identify the exact shard/release and execution profile;
+Node worker measurements are not reference-mobile results. See
+[worker evidence](../operations/settlement-browser-worker-performance.md) and
+[lookup validation](../operations/static-scientific-lookup.md).
 
-- Brotli-compressed serialized indexes;
-- core/coastal sharding and lazy initialization;
-- numeric IDs and compact repeated fields;
-- bounded fuzzy candidate expansion and result count;
-- deterministic ranking without per-query network calls;
-- transfer the index to one worker rather than copying it repeatedly;
-- measure peak worker memory as well as latency.
+The exact lookup selects the nearest native AR6 location by Haversine distance
+and reads three integer quantiles. It does not map binary raster classes 0/1
+to exposure. The range store authorizes complete digest-bound COG chunks, then
+serves eligible slices; network volume is not necessarily one tiny pixel read.
 
-Use multilingual, duplicate-name, and small-village fixtures when benchmarking;
-a tiny best-case corpus is not representative. The first release must record
-raw/compressed shard sizes, record counts, initialization p50/p95, query
-p50/p95, and peak memory on the reference mobile device.
+Core/coastal shard loading, lazy Brotli decoding and bounded range storage limit
+work. Visual PMTiles uses network-only `no-store`; its immutable URL does not
+permit assuming a persistent tile cache. Offline claims apply only to admitted
+resources and warmed chunks.
 
-## 5. Map and assessment performance
+## Measurements still needed
 
-### 5.1 Visual layers
+Public atlas qualification needs cold startup, local/source preparation time,
+search latency on the full index, raster inspection/tile throughput, memory,
+transfer and public-host measurements. Record edition, revision, data identity,
+cache state, browser/hardware and failures. Do not extrapolate a fixture or
+loopback result into public mobile capacity.
 
-PMTiles stores each visual layer in one append-only, hash-bound archive and
-uses network-only HTTP byte ranges with `no-store` request/response policy.
-The build should optimize directory locality, zoom limits, tile
-extent, and compression against measured map quality. MapLibre loads only the
-selected scenario/horizon layer and the visible viewport.
-
-Cancel or ignore stale range work when a user switches controls quickly. Do
-not preload all nine layers. The basemap is non-authoritative: its outage may
-degrade visual context but must not block a cached assessment.
-
-### 5.2 Exact lookup
-
-The analysis COG is read only for the block needed by the selected coordinate.
-The browser:
-
-1. resolves the pinned artifact from `manifest.json`;
-2. converts longitude/latitude with the shared, golden-tested transform;
-3. reads the smallest required byte range;
-4. performs nearest-neighbour class lookup;
-5. maps `0`, `1`, or nodata to the domain result.
-
-Cache COG metadata and recently used blocks, but keep a bounded
-least-recently-used policy. PMTiles colours are never reverse-engineered into a
-scientific result.
-
-### 5.3 Release/cache consistency
-
-Every cache key includes `dataReleaseId`. An application session never mixes
-config, geometry, index, or raster ranges from different releases. Immutable
-assets receive a one-year cache lifetime; only a small release pointer may use
-a short TTL and revalidation.
-
-## 6. Scalability and cost
-
-Static assets scale at the CDN/object-storage layer without application
-autoscaling. Origin load is primarily cache misses and range requests. The
-relevant capacity variables are:
-
-- total retained release bytes;
-- average range count and bytes per map/assessment interaction;
-- cache-hit ratio by artifact and region;
-- Class A/Class B object-storage operations;
-- browser memory and persistent-cache quota;
-- publish-job compute, duration, and temporary storage.
-
-Before each release, generate a dated cost model with active/rollback release
-sizes, expected traffic, requests per journey, cache assumptions, and provider
-free-tier/pricing inputs. The target is EUR 0/month while Cloudflare allowances
-cover the workload, excluding the domain, but architecture correctness must
-not depend on an unchanged free tier.
-
-Open formats keep scale-out portable: another provider needs static HTTPS,
-CORS, `HEAD`, byte-range `GET`, and suitable cache headers. No proprietary
-runtime compute is required.
-
-## 7. Build-plane performance
-
-Offline work is allowed to be heavy, but must remain reproducible and
-operable:
-
-- acquire each pinned source once and reuse a checksum-verified cache;
-- chunk rasters to cap peak memory and expose resumable stages;
-- share normalized DEM/boundary work across all nine combinations;
-- use DuckDB Spatial for set-based settlement joins and GeoParquet output;
-- parallelize independent scenario/horizon transforms within measured CPU,
-  memory, and I/O limits;
-- record per-stage wall time, peak memory, input/output bytes, and cache hits;
-- do not publish partial combinations after a failed build.
-
-Optimization never bypasses scientific validation. A faster transform that
-changes values or connectivity requires review and a new methodology release.
-
-## 8. Measurement plan
-
-Measure four profiles separately:
-
-| Profile | Purpose |
-|---|---|
-| Cold first visit | App-shell and critical-path budget |
-| Search first use | Index transfer, worker initialization, memory |
-| Cold assessment | Object range count/bytes and end-to-end interaction |
-| Warm/offline assessment | Local calculation and cache behaviour |
-
-Collect p50, p95, and failure rate over enough iterations after a documented
-warm-up. Browser E2E must assert zero legacy application API calls. Delivery
-smoke tests run from at least two European regions and verify `HEAD`, partial
-`GET`, CORS, cache headers, and content integrity.
-
-Publish the current results and artifact-size breakdown on
-`/about/architecture`. Until these measurements exist, documentation must say
-“target” rather than claim the budgets have been achieved.
-
-The [Phase 0.3 regional measurement](../evidence/phase-0-regional-fixture.md)
-proves exact `206` ranges and lookup mechanics only for a 143,754-byte real DEM
-derivative on a loopback reference profile. It explicitly does not validate
-production-network latency, mobile performance, PMTiles, or nine-layer scale;
-the scientific gate blocked those measurements before class generation.
-
-The [Phase 0.9 attempt](../evidence/phase-0-9-regional-gate.md) again stops
-before scientific arrays, now across the exact nine-combination matrix. It
-therefore records COG/PMTiles/GeoParquet QA, build time, peak memory, range
-locality, request count, and browser latency as `not-generated` or `not-run`.
-Those target budgets remain unmeasured and cannot be inferred from source
-checks or unit-test duration.
-
-The [settlement worker harness](../operations/settlement-browser-worker-performance.md)
-adds exact receipt/byte, size, build, initialization, query, and observed worker
-memory evidence for production-sized search shards. Its Node worker profile is
-an execution surrogate; it explicitly does not satisfy the browser/mobile
-promotion profile or authorize the release targets above.
-
-## 9. Failure and degradation rules
-
-- If a required uncached range is unavailable, return a clear
-  connectivity/data-availability state; never guess.
-- If the basemap fails, preserve search and assessment and explain the visual
-  degradation.
-- If worker initialization exceeds its budget, keep input responsive and show
-  explicit loading state.
-- If a release exceeds storage or request budgets, do not silently reduce
-  scientific resolution; review packaging, scope, and cost explicitly.
-- If a manifest, checksum, or release identity is inconsistent, fail closed
-  for assessment and retain the previous valid release.
-
-The legacy 3.5-second API budget, database indexes, container autoscaling, and
-TiTiler load tests are superseded by the browser, artifact, and delivery
-budgets above.
+No installed cloud cost model or provider allowance is established by source.
+Future hosting estimates must use measured bytes/operations and dated provider
+inputs. Reproducible AR6 stages and source-cache reuse reduce build work; they
+are separate from the provisioned atlas and its request-time raster processing.

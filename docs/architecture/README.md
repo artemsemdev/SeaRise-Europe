@@ -1,176 +1,111 @@
 # Architecture Documentation
 
-The main application is the coastal atlas defined by
-[ADR-028](adr/ADR-028-coastal-atlas-adoption.md). The normal route `/` uses a
-small illustrative fixture; the provisioned local edition uses the same UI
-with verified CoCliCo rasters and the prepared European basemap. The retained
-AR6 projection application is at `/projections/`.
+These documents describe the source code in this repository. When prose and
+implementation differ, inspect the executable source, schemas and tests first
+and update the prose. ADRs explain decisions and historical constraints; they
+are not evidence that every planned component is deployed.
 
-## Coastal atlas runtime
+Reviewed on **2026-10-04** against `origin/master` at
+`fa6c3c2a` (the base of this documentation update). No application behavior or
+scientific evidence is changed by this review.
 
-[Open the source-linked architecture diagram](diagrams/coastal-atlas/README.md)
-for an interactive overview and downloadable SVG/PNG. It describes the demo
-prerelease runtime at a pinned source revision.
+## What runs today
 
-`AtlasApp` receives one `AtlasDataSource`. Its catalog, place search, point
-inspection, and tile methods use strict browser contracts without filesystem
-paths. The fixture provider is deterministic and browser-local. The real-local
-HTTP provider talks only to the explicitly started loopback adapter, which
-verifies local inputs and owns the Python raster process. A service failure
-remains a technical error; it never selects a different data edition.
-
-```mermaid
-flowchart LR
-    UI[Atlas interface] --> Source[AtlasDataSource]
-    Source --> Fixture[Small authored fixture]
-    Source --> HTTP[Real-local HTTP adapter]
-    HTTP --> Context[Verified European place index and basemap]
-    HTTP --> Raster[Python raster service]
-    Raster --> Files[Verified local CoCliCo rasters]
-```
-
-The edition is selected at build/development startup. Preview verifies that its
-mode matches the built document. Real-local listeners are restricted to
-loopback. Large source files stay outside the application build and Git.
-The atlas does not register a service worker; the retained projection worker
-precaches its own document and resources and passes atlas requests through.
-
-MapLibre and its bundled worker load separately from the initial interface.
-The map displays Europe, including complete Ukraine and Crimea. Geographic
-detail and modeled depth are separate layers; closer zoom does not increase
-the source's native 25-meter cell resolution. See the
-[product contract](../product/COASTAL_ATLAS_PRD.md) and
-[development workflow](../operations/coastal-atlas-development.md) for the
-six supported combinations and reproducible local commands.
-
-## Retained projection architecture
-
-The following decisions and evidence describe the AR6 reference application.
-Its offline pipeline builds immutable COG, PMTiles, GeoParquet, JSON, and STAC
-artifacts; its static browser searches settlements and returns ADR-024's four
-projection result states. Its source identities, scientific evidence, and
-release history remain independent of the coastal atlas. The retired
-service-based application remains removed under ADR-025.
-
-### Projection reference decisions
-
-Read in this order:
-
-1. [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md) — decision,
-   alternatives, consequences, costs, scientific gates, and migration.
-2. [System context](01-system-context.md) — actors, boundaries, dependencies,
-   and project outcomes.
-3. [ADR-026](adr/ADR-026-authoritative-browser-range-persistence.md) — exact
-   complete-resource, COG-range, PMTiles, failure, and private-candidate storage
-   boundaries.
-4. [Container view](02-container-view.md) — build, artifact, delivery, and
-   browser responsibilities.
-5. [Browser application](03a-frontend-architecture.md) — runtime components,
-   search, assessment, map, state, and offline behaviour.
-6. [Atomic projection state](17-atomic-projection-state.md) — release-scoped
-   transitions and stale-completion guards.
-7. [Data architecture](05-data-architecture.md) — immutable release layout and
-   public data contracts.
-8. [Pipeline](16-geospatial-data-pipeline.md) — reproducible source-to-release
-   processing and publication gates.
-9. [Deployment](08-deployment-topology.md) — Cloudflare/R2 reference topology
-   and portable delivery requirements.
-
-## Retained projection document set
-
-| Document | Purpose |
+| Surface | Implementation and data |
 |---|---|
-| [01 — System Context](01-system-context.md) | Users, external sources, trust boundaries, and success outcomes |
-| [02 — Container View](02-container-view.md) | Executable/deployable units and their responsibilities |
-| [03a — Browser Application](03a-frontend-architecture.md) | React/Vite, Web Worker search, local assessment, MapLibre, caching |
-| [04 — Runtime Sequences](04-runtime-sequences.md) | Bootstrap, search, assessment, scenario switch, offline, and release-update flows |
-| [05 — Data Architecture](05-data-architecture.md) | Release structure, schemas, COG/PMTiles/GeoParquet/STAC, GeoNames datasets |
-| [07 — Security Architecture](07-security-architecture.md) | Browser privacy, CSP/CORS, artifact integrity, CI supply chain, threats |
-| [08 — Deployment Topology](08-deployment-topology.md) | Static Assets, R2 custom domain, OpenTofu, environments, rollback |
-| [09 — Observability and Operations](09-observability-and-operations.md) | Release evidence, synthetic checks, privacy-safe telemetry, runbooks |
-| [10 — Testing Strategy](10-testing-strategy.md) | Scientific, contract, artifact, browser, offline, accessibility, and parity gates |
-| [11 — Decision Register](11-architecture-decisions.md) | Compact list of active and superseded decisions |
-| [12 — Risks and Open Questions](12-risks-assumptions-and-open-questions.md) | Current uncertainty and required exit evidence |
-| [13 — Domain Model](13-domain-model.md) | Four projection result states and browser/pipeline domain contracts |
-| [14 — Integration Patterns](14-integration-patterns.md) | Build ingestion, publication, HTTPS artifact contracts, basemap boundary |
-| [15 — Performance and Scalability](15-performance-and-scalability.md) | Browser/CDN budgets, caching, range requests, and cost controls |
-| [16 — Geospatial Pipeline](16-geospatial-data-pipeline.md) | Real-data workflow, settlement index, reproducibility, and validation |
-| [17 — Atomic Projection State](17-atomic-projection-state.md) | Immutable result/selection/release tuple and guarded state transitions |
-| [Public release contracts](../../contracts/release/README.md) | Authoritative JSON Schemas, version compatibility, deprecation, and rollback |
-| [ADR directory](adr/README.md) | Standalone architecture decision records and ADR conventions |
-| [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md) | Authoritative static-first architecture decision |
-| [ADR-026](adr/ADR-026-authoritative-browser-range-persistence.md) | Authoritative complete-resource, COG range, and PMTiles persistence boundary |
+| `/`, normal build | Coastal atlas using an explicitly illustrative browser fixture |
+| `/`, real-local mode | Same UI, read-only loopback Node adapter and Python raster service over separately provisioned CoCliCo inputs |
+| Sealed private demo | Source/app/data-bound candidate of the real-local edition, launched on loopback |
+| `/projections/` | Retained AR6 reference: local Worker search and exact lookup over a pinned browser v2 release |
+| `/about/architecture/` | Projection reference build/status page |
 
-Supporting projection reference documents:
+Atlas uses SSP585, 2030/2050/2100 and two defense assumptions; its point states
+are positive depth, valid zero and unknown. AR6 uses three scenarios × three
+years and four projection outcomes. Their scientific meanings, IDs, search
+implementations and persistence policies are separate.
 
-- [Provisional methodology](../methodology.md)
-- [Static-first migration plan](../delivery/README.md)
-- [Product requirements](../product/PRD.md)
-- [Content guidelines](../product/CONTENT_GUIDELINES.md)
-- [Canonical Flight visual and interaction contract](../product/Mock/DESIGN.md)
+Atlas has no service-worker registration or offline-data promise. The retained
+projection worker is root-scoped but precaches only its own allowed resources;
+private atlas responses are `no-store`. The local adapter is not public hosting.
+Cloudflare/R2 remain a reference delivery direction; no OpenTofu deployment or
+public atlas distribution is implemented here.
 
-Retained AR6 components implement the canonical Flight experience rather than
-substituting a generic dashboard or map utility. ADR-024 overrides the mock's
-binary exposure, terrain comparison, modeled-water/flood meaning, and related
-scientific copy; it does not override Flight's layout, information hierarchy,
-map-first composition, controls, responsive behavior, or interaction character.
+## Read and navigate
 
-## Status model
+Start with [01 — System Context](01-system-context.md),
+[02 — Container View](02-container-view.md), then
+[03a — Frontend](03a-frontend-architecture.md). For operation, use the
+[atlas development guide](../operations/coastal-atlas-development.md) and
+[private demo candidate runbook](../operations/local-demo-candidate.md).
 
-Documents use these terms consistently:
+There are **16 numbered topic documents plus this README: 17 Markdown files at
+this directory's top level**. The numbering is historical: `03a` is the retained
+frontend view and there is no active `06`. ADRs and diagrams are additional
+subdirectories, not missing numbered views.
 
-| Status | Meaning |
-|---|---|
-| Current | Implemented repository architecture backed by executable gates |
-| Accepted target | The decision is approved for new work, even if migration is incomplete |
-| Provisional | Evidence is incomplete; the content cannot authorize a real-data release |
-| Released | Immutable artifacts have passed all scientific and technical gates and were published |
-| Superseded | No longer active guidance; retained only in Git history or the decision register |
+| Document | Current scope | Main implementation anchor |
+|---|---|---|
+| [01 — System Context](01-system-context.md) | Products, actors, local/static boundaries | [Entries](../../src/web/vite.config.ts) |
+| [02 — Container View](02-container-view.md) | Browser, Node/Python and offline execution units | [Adapter](../../src/web/scripts/real-local-atlas.mjs) |
+| [03a — Frontend](03a-frontend-architecture.md) | Actual components, providers, routes and state | [AtlasApp](../../src/web/src/atlas/AtlasApp.tsx), [App](../../src/web/src/App.tsx) |
+| [04 — Runtime Sequences](04-runtime-sequences.md) | Atlas/demo flows and retained projection lifecycle | [Demo launcher](../../scripts/demo/demo.mjs), [controller](../../src/web/src/application/assessment-controller.ts) |
+| [05 — Data Architecture](05-data-architecture.md) | Browser/disk contracts, AR6 v1/v2 and storage | [Atlas contract](../../src/web/src/atlas/browser-data-contract.ts), [v2 schema](../../contracts/release/v2/manifest.schema.json) |
+| [07 — Security](07-security-architecture.md) | Local trust, privacy, CSP and supply chain | [Edition boundary](../../src/web/scripts/atlas-edition.mjs), [build checks](../../src/web/scripts/inspect-build.mjs) |
+| [08 — Deployment](08-deployment-topology.md) | Fixture, real-local and sealed-demo builds; hosting limits | [Commands](../../package.json), [sealed preview](../../scripts/demo/sealed-preview.mjs) |
+| [09 — Operations](09-observability-and-operations.md) | Available evidence and diagnosis, monitoring gaps | [CI](../../.github/workflows/ci.yml) |
+| [10 — Testing](10-testing-strategy.md) | Suite scopes, commands and release limits | [Inventory](../../tests/test-inventory.json) |
+| [11 — Decisions](11-architecture-decisions.md) | ADR-028 atlas adoption and retained decisions | [ADR index](adr/README.md) |
+| [12 — Risks](12-risks-assumptions-and-open-questions.md) | Open delivery/evidence gaps and resolved implementation choices | [Demo identity](../../scripts/demo/candidate.mjs) |
+| [13 — Domain Model](13-domain-model.md) | Actual atlas and projection types and outcomes | [Projection domain](../../src/web/src/domain/release.ts) |
+| [14 — Integrations](14-integration-patterns.md) | Provider HTTP, Worker messages, candidate and artifact handoffs | [HTTP provider](../../src/web/src/atlas/http-data-source.ts) |
+| [15 — Performance](15-performance-and-scalability.md) | Enforced budgets, local limits and qualified measurements | [Budget evaluator](../../src/web/scripts/lighthouse-budget.mjs) |
+| [16 — Geospatial Processing](16-geospatial-data-pipeline.md) | Local raster sampling and retained offline AR6 build | [Raster service](../../scripts/atlas/europe_raster_service.py), [builder](../../src/pipeline/searise_pipeline/offline_release/) |
+| [17 — Atomic Projection State](17-atomic-projection-state.md) | Projection-only accepted tuple and stale-work guards | [Reducer](../../src/web/src/domain/projection-state.ts) |
 
-No document may use “implemented,” “validated,” or “production-ready” for the
-target architecture without executable evidence.
+## Diagram and supporting material
 
-## Fixed AR6 reference contracts
+The [coastal atlas diagram](diagrams/coastal-atlas/README.md) includes an
+interactive viewer, SVG/PNG exports and a source-linked editable specification.
+It is pinned to its reviewed demo source commit; preserve its recorded
+provenance rather than treating it as a live generated code view.
 
-- Scenarios: `ssp1-26`, `ssp2-45`, `ssp5-85`.
-- Horizons: `2030`, `2050`, `2100`.
-- Defaults: `ssp2-45`, `2050`.
-- Result states: `ProjectionAvailable`, `DataUnavailable`, `OutOfScope`, and
-  `UnsupportedGeography`.
-- Normal runtime API calls: zero.
-- Data selection: one pinned `dataReleaseId` per application session.
-- Published releases: immutable and checksum-addressable.
-- Projection lookup: nearest native AR6 grid location within 100 km, with no
-  interpolation, fallback, or rendered-colour sampling.
-- Search: local qualifying records from a declared GeoNames snapshot.
-- Browser persistence: verified complete resources use Cache Storage;
-  integrity-authorized COG chunks may use bounded IndexedDB; PMTiles remains
-  network-only and visual-only with a `no-store` caching policy.
+Supporting authorities:
 
-## Deliberately removed documents
+- [ADR-028](adr/ADR-028-coastal-atlas-adoption.md): atlas adoption and local adapter.
+- [ADR-027](adr/ADR-027-post-cutover-application-evolution.md): evolution after
+  completed legacy removal without rewriting historical authority.
+- [ADR-024](adr/ADR-024-ar6-regional-projection-contract.md) and
+  [ADR-026](adr/ADR-026-authoritative-browser-range-persistence.md): retained
+  projection science and browser persistence.
+- [Atlas requirements](../product/COASTAL_ATLAS_PRD.md),
+  [design](../product/COASTAL_ATLAS_DESIGN.md),
+  [content](../product/COASTAL_ATLAS_CONTENT.md): atlas product interpretation.
+- [AR6 methodology](../methodology.md) and
+  [Flight design](../product/Mock/DESIGN.md): projection reference only.
+- [Demo prerelease record](../releases/v0.1.0-rc.1.md): source deliverable and
+  limitations; it does not distribute private CoCliCo data or qualify the MVP.
 
-The following documents were deleted because they described retired runtime
-components or duplicated current views:
+## Evidence and maintenance rules
 
-- API component view;
-- REST API contracts;
-- Azure/open-question closure proposal;
-- monolithic UML view of the legacy distributed system;
-- relational entity-relationship model.
+**Implemented** means backed by checked-in executable behavior. **Target** means
+a decision or requirement still awaiting implementation/evidence. **Fixture**
+proves software behavior only. **Private local demo** is a sealed local artifact,
+not public/scientific approval. Historical scientific dispositions and published
+records retain their original scope and identity.
 
-Historical decisions remain recoverable through Git. They are not kept in the
-active index because a reader should not have to guess which architecture is
-current.
+Keep these views aligned with source in the same PR as a behavior change:
 
-## Documentation maintenance rules
+1. Update the owning view and its implementation links; do not duplicate full
+   TypeScript/JSON schemas into prose.
+2. Distinguish atlas editions, projection releases, local candidates and public
+   release authority.
+3. Describe actual paths/commands. Label future hosting, telemetry and source
+   preparation explicitly as gaps, not installed infrastructure.
+4. Update the decision register and ADR index when a decision changes; retain
+   accepted ADR history and immutable receipts.
+5. Check relative links, `git diff --check`, suite routing and any affected
+   contract/content checks before review.
 
-- ADR-028 governs the coastal atlas; ADR-021 and its amendments govern the
-  retained AR6 reference and their explicitly retained delivery contracts.
-- A materially different runtime, scientific method, hosting dependency, or
-  privacy model requires a new ADR.
-- Update diagrams and prose in the same pull request as a contract change.
-- Keep product language independent from storage/provider implementation.
-- Link to one canonical definition instead of copying large contracts.
-- Remove completed/superseded plans; use pull requests and signed manifests as
-  historical evidence.
-- Run a relative-link check and `git diff --check` before review.
+Removed API, REST, relational and legacy server views remain in Git history.
+Do not recreate them to fill numbering gaps. [docs/README.md](../README.md)
+indexes the wider documentation collection; this README indexes architecture.

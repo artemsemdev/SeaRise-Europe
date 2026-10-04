@@ -1,9 +1,13 @@
 # SeaRise Europe documentation
 
-The accepted main product is the coastal atlas. Engineering adoption is tracked
-in [#490](https://github.com/artemsemdev/SeaRise-Europe/issues/490). The main route
-uses the illustrative atlas fixture by default; the retained projection entry
-is at `/projections/`.
+The main product is the coastal atlas: `/` uses an illustrative fixture by
+default, with explicit provisioned real-local and sealed private-demo workflows.
+The retained AR6 projection reference is at `/projections/`.
+
+Source code, executable contracts and tests are the primary implementation
+reference. The [architecture README](architecture/README.md) indexes all 16
+topic views, their source anchors, decisions and the diagram; it distinguishes
+implemented behavior from future delivery work.
 
 | Question | Read |
 | --- | --- |
@@ -14,7 +18,7 @@ is at `/projections/`.
 | How do I prepare a local demo candidate? | [Candidate preparation, demonstration and rollback](operations/local-demo-candidate.md) |
 | How do I contribute today? | [Contributor commands](../CONTRIBUTING.md), [testing](testing/README.md) |
 | What is implemented? | [Architecture overview](architecture/README.md); guides change with each implementation PR |
-| What remains? | [Atlas adoption epic](https://github.com/artemsemdev/SeaRise-Europe/issues/490); public hosting is a later workstream |
+| What remains? | [Current risks and open decisions](architecture/12-risks-assumptions-and-open-questions.md), [scoped backlog](delivery/coastal-atlas-backlog.md); public hosting is separate work |
 
 ## Scoped reference and history
 
@@ -23,7 +27,7 @@ is at `/projections/`.
   [vision](product/VISION.md) describe the retained projection app.
 - [Projection methodology](methodology.md) and
   [ADR-024](architecture/adr/ADR-024-ar6-regional-projection-contract.md) preserve
-  the published relative-level contract. They are not the atlas depth methodology.
+  the retained relative-level contract. They are not the atlas depth methodology.
 - The [Flight design](product/Mock/DESIGN.md) is scoped to that reference app.
 - Existing scientific evidence, receipts, and past decisions keep their original
   paths and outcomes. The [earlier delivery roadmap](delivery/README.md) records

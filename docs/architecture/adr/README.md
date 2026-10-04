@@ -1,7 +1,9 @@
 # Architecture Decision Records
 
-This directory contains the authoritative Architecture Decision Records for
-SeaRise Europe. The parent
+This directory contains Architecture Decision Records for SeaRise Europe.
+They preserve decision history; the source-backed parent views describe what is
+implemented now. ADR-028 governs the main atlas; the earlier static/projection
+decisions retain their explicitly scoped authority. The parent
 [decision register](../11-architecture-decisions.md) summarizes which decisions
 are active, amended, or superseded.
 
@@ -9,9 +11,11 @@ are active, amended, or superseded.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-021](ADR-021-static-first-offline-geospatial-architecture.md) | Accepted | Adopt the static-first offline geospatial architecture |
+| [ADR-028](ADR-028-coastal-atlas-adoption.md) | Accepted engineering direction | Main coastal atlas, explicit fixture/real-local editions and read-only loopback adapter; no public/scientific approval |
+| [ADR-027](ADR-027-post-cutover-application-evolution.md) | Accepted | Evolve current source while preserving completed removal authority |
+| [ADR-021](ADR-021-static-first-offline-geospatial-architecture.md) | Accepted | Static-first retained projection/build architecture; atlas runtime amended by ADR-028 |
 | [ADR-024](ADR-024-ar6-regional-projection-contract.md) | Accepted; Phase 1 evidence complete | Report source-native AR6 regional projection values without terrain exposure classification |
-| [ADR-025](ADR-025-accelerated-static-runtime-cutover.md) | Accepted | Make the static application the only repository runtime in Phase 2; recover removed source through Git history |
+| [ADR-025](ADR-025-accelerated-static-runtime-cutover.md) | Accepted | Completed legacy-runtime repository cutover; recover removed source through Git history, with later evolution under ADR-027/028 |
 | [ADR-026](ADR-026-authoritative-browser-range-persistence.md) | Accepted | Persist complete resources in Cache Storage and only integrity-authorized COG chunks in bounded IndexedDB; keep PMTiles network-only and `no-store` |
 
 ## Superseded publication decisions
