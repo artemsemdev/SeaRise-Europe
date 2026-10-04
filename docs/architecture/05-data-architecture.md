@@ -1,224 +1,131 @@
 # 05 — Data Architecture
 
-> **Status:** Current static-only repository architecture
->
-> **Sources of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md) and [ADR-026](adr/ADR-026-authoritative-browser-range-persistence.md)
-> **Important:** checked-in demo rasters and the current pipeline are not a validated real-data release.
+> **Status:** Implemented data boundaries, reviewed 2026-10-04.
+> TypeScript/Python contracts and versioned schemas are the source of truth.
 
-## 1. Data model in one sentence
+## Separate data products
 
-SeaRise Europe is an immutable, versioned geospatial data product: an offline
-build turns pinned source snapshots into browser-ready files, and the browser
-reads those files directly without an application API, PostgreSQL, PostGIS, or
-a runtime tile server.
+| Concern | Coastal atlas | AR6 projection reference |
+|---|---|---|
+| Browser entry contract | `coastal-atlas-browser-v1` | Browser release manifest `2.0.0` |
+| Matrix | SSP585 × 3 years × 2 defense assumptions | 3 SSP scenarios × 3 horizons |
+| Point values | Depth in metres: positive, valid zero, unknown | Exact AR6 q0.167/q0.5/q0.833 in integer millimetres and derived metres |
+| Source resolution | 25 m CoCliCo cells in real-local; fixture only illustrates the contract | Native 1° AR6 source grid |
+| Point access | Fixture grid or local Python raster read | Browser COG lookup |
+| Visual layer | Provider-rendered PNG tiles | Visual-only projection PMTiles |
+| Persistence | No atlas durable data store | Verified complete resources and authorized COG chunks |
 
-```mermaid
-flowchart LR
-    Sources["Pinned source snapshots"] --> Build["Offline build + QA"]
-    Build --> Release["Immutable release directory"]
-    Release --> Manifest["manifest.json"]
-    Release --> Raster["Analysis COG + visual PMTiles"]
-    Release --> Search["Search indexes + GeoParquet"]
-    Release --> Metadata["Config + static STAC + provenance"]
-    Manifest --> Browser["Static browser application"]
-    Raster --> Browser
-    Search --> Browser
-```
+Neither atlas catalog IDs nor depth values may be used as AR6 release identities
+or outcomes. The retained terrain-comparison no-go is not atlas source evidence.
 
-## 2. Data realms and ownership
+## Atlas browser and disk contracts
 
-| Realm | Content | Location | Writer | Runtime reader |
-|---|---|---|---|---|
-| Source cache | Original IPCC, GeoNames, and Natural Earth snapshots | Ignored local/CI storage | Acquisition stage | None |
-| Build workspace | Normalized arrays, temporary rasters, DuckDB files, intermediate tables | Ephemeral local/CI workspace | Offline pipeline | None |
-| Release artifacts | Manifest, config, boundaries, search indexes, COG, PMTiles, GeoParquet, STAC, provenance | Versioned static host/object storage | Controlled publish job | Browser and reviewers |
-| Browser cache | Verified complete resources in Cache Storage and integrity-authorized COG chunks in bounded IndexedDB; PMTiles is network-only with a `no-store` caching policy | User device | Service worker/browser | Browser only |
+[`browser-data-contract.ts`](../../src/web/src/atlas/browser-data-contract.ts)
+uses exact-field validators and immutable values for catalog, place, search,
+inspection and tile counts. The catalog includes edition, bounds, source
+attribution and exactly six layer identities. It contains no disk path, byte
+size, checksum, or private provenance receipt.
 
-No project-controlled system stores user searches, selected places, or precise
-coordinates. GeoNames place coordinates and scientific source coordinates are
-public dataset content, not user data.
-
-## 3. Immutable release layout
-
-Every published data release is self-contained and addressable by
-`dataReleaseId`:
+The provisioned disk tree is read by
+[`real-local-atlas.mjs`](../../src/web/scripts/real-local-atlas.mjs) and
+[`real-local-context.mjs`](../../src/web/scripts/real-local-context.mjs):
 
 ```text
-releases/{dataReleaseId}/
-├── manifest.json
-├── manifest.schema.json
-├── manifest.sigstore.json
-├── provenance.intoto.jsonl
-├── config/
-│   ├── scenarios.json
-│   ├── methodology.json
-│   └── source-attribution.json
-├── geography/
-│   ├── europe.pmtiles
-│   ├── coastal-analysis-zone.pmtiles
-│   └── boundaries.parquet
-├── search/
-│   ├── europe-core.codepoint-trie.json.br
-│   ├── europe-coastal.codepoint-trie.json.br
-│   ├── settlement-browser-search-shards.receipt.json
-│   └── settlements.parquet
-├── layers/
-│   ├── ssp1-26/{2030,2050,2100}.pmtiles
-│   ├── ssp2-45/{2030,2050,2100}.pmtiles
-│   └── ssp5-85/{2030,2050,2100}.pmtiles
-├── analysis/
-│   ├── ssp1-26/{2030,2050,2100}.tif
-│   ├── ssp2-45/{2030,2050,2100}.tif
-│   └── ssp5-85/{2030,2050,2100}.tif
-└── stac/
-    ├── catalog.json
-    ├── collection.json
-    └── items/*.json
+local-data/atlas/europe/       # ignored; can be explicitly overridden
+  manifest.json              # disk v2: SSP585 / high-tide / six layers
+  <manifest raster paths>    # confined source TIFFs
+  context/manifest.json      # place count and exact index byte identity
+  context/<index>.json.br    # prepared place records and aliases
+  basemap/                   # prepared PMTiles, glyphs, sprites and metadata
 ```
 
-Paths are release-versioned or content-addressed and are never overwritten.
-Versioned objects use `Cache-Control: public, max-age=31536000, immutable` as
-the generic publication default. ADR-026 and the checked-in
-[`HTTP delivery policy`](../../contracts/http-delivery/v1/policy.json) override
-that transport policy for visual PMTiles: `200`, `206`, and `416` responses are
-`no-store`, even though their release paths remain append-only. Analysis COGs
-and other release objects retain immutable delivery. A mutable `/release.json`,
-if used, has a short TTL and only points to a release; an application build
-pins one release for the duration of a session.
+This is a provisioned workspace, not an output automatically built by
+`npm run local:start`. The adapter converts disk `high-tide` to browser
+`spring-high-tide`, strips private fields, validates raster metadata/path/size,
+and starts Python for full raster digest validation. The context loader verifies
+the exact Brotli bytes, record count and unique place IDs before serving search.
+Basemap delivery confines paths and media types; it does not use the AR6
+manifest's per-artifact digest authority.
 
-## 4. Public contracts
+## Atlas fixture and validity
 
-### 4.1 Release manifest
+[`synthetic-fixture.ts`](../../src/web/src/atlas/synthetic-fixture.ts) contains
+four example places and six 4 × 4 grids over a small Venice extent. The
+[`fixture provider`](../../src/web/src/atlas/fixture-data-source.ts) samples that
+same grid for point inspection and requested 256 × 256 Web Mercator PNGs.
+Other searchable fixture places have unknown inspection values outside the
+bounded grid; the fixture is not Europe-wide scientific coverage.
 
-`manifest.json` is the application entry point and authoritative release
-inventory. Its authoritative shape is the versioned
-[`manifest.schema.json`](../../contracts/release/v1/manifest.schema.json); the
-complete contract catalogue and compatibility policy live beside the schemas
-in [`contracts/release/README.md`](../../contracts/release/README.md).
+Positive cells count as flooded and valid. Zero cells count as valid but are
+transparent; unknown cells are also transparent and do not count as valid.
+Consequently transparency is not an availability signal. Tile response counts
+must satisfy `0 <= floodPixels <= validPixels <= 65536`. Transport/read failures
+are errors, not unknown cells.
 
-Publication fails if the schema, sizes, hashes, source metadata, licence
-mapping, or nine-combination matrix is incomplete.
+## Retained AR6 release architecture
 
-### 4.2 Configuration
+The public offline builder retains [v1 schemas](../../contracts/release/v1/).
+The browser consumes the
+[v2 manifest](../../contracts/release/v2/manifest.schema.json), with base-release
+and browser-derivation identities, source-grid identity and COG range-integrity
+metadata. [Generated contracts](../../src/web/src/contracts/generated/release-contract.ts)
+and [ManifestRepository](../../src/web/src/data/manifest-repository.ts) determine
+the supported browser shape. Private-engineering binding is separately validated.
 
-Configuration is data, not code. Its exact shapes are defined by
-[`scenario-config.schema.json`](../../contracts/release/v1/scenario-config.schema.json),
-[`methodology.schema.json`](../../contracts/release/v1/methodology.schema.json),
-and [`attribution.schema.json`](../../contracts/release/v1/attribution.schema.json).
-The release fixes:
+The standard Vite build copies the committed v1 release fixture, then overlays
+its committed v2 browser derivation at the same pinned release prefix. It
+remains synthetic and pending owner disposition; a version-looking directory
+name or signature-shaped fixture is not proof of a public release.
 
-- scenarios: `ssp1-26`, `ssp2-45`, and `ssp5-85`;
-- horizons: `2030`, `2050`, and `2100`;
-- defaults: `ssp2-45` and `2050`;
-- methodology text, limitations, units, nodata meaning, result-state mapping,
-  and source attribution.
+The manifest, not a hard-coded directory layout, resolves artifact paths:
 
-Changing scientific semantics requires a new methodology version and release.
-The UI must display the release and methodology used for every assessment.
-
-### 4.3 Raster artifacts
-
-Each scenario/horizon produces two derived views of the same validated,
-source-native projection array:
-
-| Artifact | Purpose | Contract |
-|---|---|---|
-| Analysis COG | Exact nearest-grid projection lookup | Lossless Int16 millimetres for q0.167, q0.5, and q0.833 plus nodata; valid COG; fixed CRS/grid recorded in manifest |
-| Visual PMTiles | Efficient overlay rendering | Byte-range readable; visually consistent with the analysis COG; never interpreted from rendered colours |
-
-All three required quantiles map to `ProjectionAvailable`; source nodata or a
-nearest location beyond the 100 km guardrail maps to `DataUnavailable`. The
-COG is the scientific lookup source and PMTiles remains visual-only.
-
-### 4.4 Boundaries and analytical tables
-
-Europe support and coastal analysis geometry are versioned release inputs and
-outputs. Browser-oriented geometry is packaged as PMTiles; transparent,
-queryable tables are published as GeoParquet. DuckDB Spatial performs offline
-spatial joins and validation; it is not a production database.
-
-The checked-in Natural Earth-derived boundary and 25 km coastal zone are
-explicit approximations for migration and Phase 0. They do not become
-canonical production data merely by being packaged.
-
-### 4.5 Settlement catalog and search indexes
-
-The source is a pinned GeoNames dump plus `alternateNamesV2`. The pipeline
-produces two logical catalogs:
-
-- `europe-core`: active populated places in the support geometry with
-  population at least 500, plus national and administrative capitals;
-- `europe-coastal`: all active populated places in the coastal zone, without a
-  population threshold.
-
-Included feature codes are `PPL`, `PPLA`, `PPLA2`, `PPLA3`, `PPLA4`, `PPLA5`,
-`PPLC`, `PPLF`, `PPLG`, `PPLL`, and `PPLR`. Historical, abandoned, destroyed,
-and section-only records (`PPLH`, `PPLQ`, `PPLW`, `PPLX`) are excluded unless a
-documented data-quality exception says otherwise.
-
-The authoritative normalized record is
-[`search-record.schema.json`](../../contracts/release/v1/search-record.schema.json).
-
-The canonical records are published as GeoParquet. Compact Brotli-compressed
-indexes are built ahead of time and loaded into a Web Worker. The build proves
-that every qualifying source record is either present exactly once or listed
-in an auditable rejection report.
-
-### 4.6 Static STAC and provenance
-
-The STAC catalog describes spatial assets, bounds, time/scenario properties,
-roles, and links without operating a STAC API. `manifest.json` remains the
-browser contract; STAC is the standards-based discovery and portfolio layer.
-The repository's closed STAC 1.1.0 profile is
-[`stac.schema.json`](../../contracts/release/v1/stac.schema.json).
-
-The build emits SLSA-compatible provenance and a keyless Cosign/Sigstore bundle
-covering the manifest and release inventory. CI performs full verification;
-the public architecture page links to the evidence.
-
-## 5. Versioning, promotion, and rollback
-
-1. Build into a new, unpublished `dataReleaseId` prefix.
-2. Validate every source, contract, artifact, scientific control, and licence.
-3. Upload immutable files without changing the production pointer.
-4. Verify public `HEAD` and partial `GET` responses, hashes, CORS, and cache
-   headers.
-5. Deploy an application build pinned to the release, or atomically update the
-   small release pointer.
-6. Keep the previous application/release pair available for rollback.
-
-Corrections create a new release. Existing artifacts are not edited in place,
-and browser caches are namespaced by `dataReleaseId` so versions cannot mix.
-
-## 6. Lifecycle and retention
-
-| Data | Retention rule |
+| Artifact role | Implemented use |
 |---|---|
-| Raw downloads | Keep in ignored local/CI cache only as licence permits; reacquire by pinned URL/checksum |
-| Build intermediates | Disposable after a successful release; retain only when needed to investigate QA |
-| Published releases | Keep the active and rollback releases; archive or remove older versions only under a documented retention policy |
-| Manifests, source records, provenance, QA summaries | Retain with every published release |
-| Browser cache | Bounded and versioned; evict least-recently-used unleased COG chunks first; PMTiles remains network-only with a `no-store` caching policy |
-| User search/location data | Never collected or retained by project infrastructure |
+| Analysis COG | Lossless three-band integer quantiles; source nodata retained |
+| Projection PMTiles | Visual overlay only; no scientific lookup authority |
+| GeoParquet | Exact analytical data and support/coastal geometry |
+| Core/coastal search shards | Serialized codepoint-trie indexes, decoded and queried in a Worker |
+| Source-grid identity and range integrity | Release-bound grid selection and authorization of exact COG chunks |
+| Methodology/config/attribution | Release-scoped interpretation and source credits |
+| STAC, receipts, provenance and evidence | Discovery, reproducibility and review; not a STAC server |
 
-## 7. Licence and integrity rules
+The settlement pipeline maintains separately versioned normalization, spatial,
+reconciliation and browser-search contracts under
+[`contracts/settlements`](../../contracts/settlements/). Atlas's prepared local
+place index is a different shape; it is not the projection worker shard format.
 
-- Raw files are not published by default; redistribution must be explicitly
-  permitted.
-- Every derivative maps to its source, licence, attribution, and checksum.
-- IPCC AR6, GeoNames, Natural Earth, and basemap attribution follow
-  the exact terms recorded in the release manifest.
-- Source and artifact SHA-256 values are verified before use and after upload.
-- The browser rejects an unsupported manifest schema or mismatched pinned
-  release instead of silently falling back.
+## Private demo candidate identity
 
-## 8. Repository boundary
+[`candidate.mjs`](../../scripts/demo/candidate.mjs) defines
+`local-demo-candidate-v1`: exact source revision, recorded toolchain, app
+inventory and six external metadata/receipt identities. Those six files are the
+atlas manifest, context manifest/source receipts and three basemap receipts.
+The app inventory includes sizes and SHA-256 for every regular file; symlinked
+paths are rejected. Candidate bytes are made read-only after verification.
 
-The request-time database, mutable blob-registration path, and dynamic tile
-service have been removed. The retained pipeline produces immutable release
-artifacts and the browser validates them before use. Historical contracts and
-Git history preserve the removal evidence without reactivating that runtime.
+The candidate is explicitly `private-local-demo`, with
+`publicPromotionAuthorized=false` and `mvpRelease=false`. It binds metadata but
+does not copy private source rasters. Startup additionally verifies the actual
+raster/index inputs through the adapter. This is a local handoff contract,
+separate from an AR6 immutable data release or public atlas distribution.
 
-See [16 — Geospatial Data Pipeline](16-geospatial-data-pipeline.md) for build
-stages and [10 — Testing Strategy](10-testing-strategy.md) for publication
-gates.
+## Retention and delivery
+
+| Data | Storage policy |
+|---|---|
+| Raw sources / local atlas inputs | Ignored local or controlled build workspace; excluded from app output |
+| Atlas JSON and derived tiles | `no-store` HTTP responses; Python has a bounded in-process tile cache |
+| Local atlas basemap responses | `no-store`; separate from AR6 PMTiles authority |
+| AR6 complete resources | Byte-verified Cache Storage admission |
+| AR6 COG chunks | Bounded integrity-authorized range storage; private sessions use their separate policy |
+| AR6 visual PMTiles | Network-only `no-store`, excluded from persistent and session range stores |
+
+The [HTTP delivery policy](../../contracts/http-delivery/v1/policy.json) overrides
+the generic immutable cache default for AR6 visual PMTiles. Published release
+corrections require a new immutable identity; no live publication is inferred
+from a local candidate. Atlas URLs contain current view/point state, while
+real-local requests also carry query/point values to loopback. There is no
+implemented user-account or application analytics store.
+
+See [16](16-geospatial-data-pipeline.md) for processing and
+[07](07-security-architecture.md) for trust boundaries.
