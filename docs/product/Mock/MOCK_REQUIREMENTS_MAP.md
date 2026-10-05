@@ -133,8 +133,13 @@ The canonical mock is intentionally self-contained so reviewers can open it
 without a build step. Its current SHA-256 is:
 
 ```text
-b09fdc2a19f9c4940ff6849f38ef8487e1bc321521b3bb5754a5c41bd4f8c476
+9d2dd7f7730e8a977461b2a0f0960424d71001309317994e2a391c4d92a76399
 ```
+
+The loader executes only the reviewed template and asset constants embedded in
+its own script. It has no nested-page message protocol and does not read
+executable content from DOM data islands. Regeneration must preserve this
+boundary; the export contains no framed pages.
 
 If the HTML export changes, update this digest and review the reconciliation map
 in the same pull request.

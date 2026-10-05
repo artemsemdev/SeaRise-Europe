@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Security
+
+- Hardened the self-contained Flight design reference: executable bundle data
+  now stays in the loader's local constants, and the unused cross-window page
+  relay has been removed.
+
 ### Fixed
 
 - Aligned all architecture views and their documentation indexes with the
