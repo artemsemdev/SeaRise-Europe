@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - Hardened the self-contained Flight design reference: executable bundle data
   now stays in the loader's local constants, and the unused cross-window page
-  relay has been removed.
+  relay has been removed. HTML mock changes now trigger CodeQL immediately.
 
 ### Fixed
 
