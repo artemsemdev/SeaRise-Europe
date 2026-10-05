@@ -130,6 +130,7 @@ CODEQL_JAVASCRIPT = (
     'src/web/**',
     'scripts/demo/**',
     'tools/static-quality/**',
+    'docs/product/Mock/*.html',
 )
 
 

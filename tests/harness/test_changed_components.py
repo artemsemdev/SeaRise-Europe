@@ -33,6 +33,15 @@ def _workflow_event_paths(workflow: str, event: str, next_event: str) -> set[str
 
 
 class ChangedComponentRoutingTests(unittest.TestCase):
+    def test_executable_product_mock_runs_web_and_codeql_checks(self) -> None:
+        outputs = classify_paths(["docs/product/Mock/SeaRise-Flight.html"])
+        self.assertTrue(outputs["web"])
+        self.assertTrue(outputs["codeql_javascript"])
+        self.assertFalse(outputs["release"])
+        self.assertFalse(outputs["pipeline"])
+        documentation = classify_paths(["docs/product/Mock/MOCK_REQUIREMENTS_MAP.md"])
+        self.assertFalse(documentation["codeql_javascript"])
+
     def test_private_demo_tooling_routes_web_and_javascript_checks(self) -> None:
         outputs = classify_paths(["scripts/demo/demo.mjs"])
         self.assertTrue(outputs["web"])
